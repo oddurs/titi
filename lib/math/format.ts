@@ -1,3 +1,5 @@
+import { isMatrix, type Matrix } from "./matrix";
+
 export type NotationMode = "normal" | "sci" | "eng";
 /** -1 means Float; 0–9 fix that many decimal places. */
 export type DecimalMode = number;
@@ -83,11 +85,21 @@ export function formatNumber(x: number, opts: FormatOpts): string {
 }
 
 export function formatValue(
-  v: number | number[],
+  v: number | number[] | Matrix,
   opts: FormatOpts,
 ): string {
   if (typeof v === "number") return formatNumber(v, opts);
+  if (isMatrix(v)) {
+    return v.m
+      .map((row) => `[${row.map((x) => formatNumber(x, opts)).join(" ")}]`)
+      .join("");
+  }
   return `{${v.map((x) => formatNumber(x, opts)).join(" ")}}`;
+}
+
+/** Column-aligned rows for the home screen, where a matrix gets real space. */
+export function formatMatrixRows(v: Matrix, opts: FormatOpts): string[][] {
+  return v.m.map((row) => row.map((x) => formatNumber(x, opts)));
 }
 
 /** Compact label for graph axis ticks — fewer digits than the home screen. */

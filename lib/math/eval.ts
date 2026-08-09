@@ -1,7 +1,9 @@
 import type { Node } from "./ast";
 import { parse } from "./parser";
+import * as M from "./matrix";
+import { MatrixError, isMatrix, type Matrix } from "./matrix";
 
-export type Val = number | number[];
+export type Val = number | number[] | Matrix;
 
 export class CalcError extends Error {
   constructor(message: string) {
@@ -17,6 +19,8 @@ export interface Env {
   ys: Record<string, string>;
   angle: "rad" | "deg";
   ans: Val;
+  /** [A]..[J] */
+  mats: Record<string, Matrix>;
   /** When true, domain errors yield NaN instead of throwing (plotting/tables). */
   lenient: boolean;
 }
@@ -28,6 +32,7 @@ export function makeEnv(partial: Partial<Env> = {}): Env {
     vars,
     lists: {},
     ys: {},
+    mats: {},
     angle: "rad",
     ans: 0,
     lenient: false,
@@ -49,17 +54,56 @@ const fail = (env: Env, msg: string): number => {
   throw new CalcError(msg);
 };
 
-/** Apply a scalar function element-wise so list arithmetic just works. */
+/** Apply a scalar function element-wise, so lists and matrices just work. */
 function map1(v: Val, f: (x: number) => number): Val {
-  return typeof v === "number" ? f(v) : v.map(f);
+  if (typeof v === "number") return f(v);
+  if (isMatrix(v)) return M.mapMatrix(v, f);
+  return v.map(f);
 }
 
 function map2(a: Val, b: Val, f: (x: number, y: number) => number): Val {
+  if (isMatrix(a) || isMatrix(b)) {
+    if (isMatrix(a) && isMatrix(b)) return M.zip(a, b, f);
+    if (isMatrix(a)) {
+      if (typeof b !== "number") throw new CalcError("ERR: DATA TYPE");
+      return M.mapMatrix(a, (x) => f(x, b));
+    }
+    if (typeof a !== "number") throw new CalcError("ERR: DATA TYPE");
+    return M.mapMatrix(b as Matrix, (y) => f(a, y));
+  }
   if (typeof a === "number" && typeof b === "number") return f(a, b);
   if (typeof a === "number") return (b as number[]).map((y) => f(a, y));
   if (typeof b === "number") return (a as number[]).map((x) => f(x, b));
   if (a.length !== b.length) throw new CalcError("ERR: DIM MISMATCH");
   return a.map((x, i) => f(x, b[i]));
+}
+
+/** Scalar `^`, with the device's domain rules. */
+function matPowScalar(env: Env, a: number, b: number): number {
+  if (a < 0 && !Number.isInteger(b)) return fail(env, "ERR: NONREAL ANS");
+  if (a === 0 && b < 0) return fail(env, "ERR: DIVIDE BY 0");
+  return Math.pow(a, b);
+}
+
+const asMatrix = (v: Val): Matrix => {
+  if (isMatrix(v)) return v;
+  throw new CalcError("ERR: DATA TYPE");
+};
+
+const asList = (v: Val): number[] => {
+  if (typeof v === "number") return [v];
+  if (isMatrix(v)) throw new CalcError("ERR: DATA TYPE");
+  return v;
+};
+
+/** Matrix errors are CalcErrors as far as the rest of the engine is concerned. */
+function lift<T>(f: () => T): T {
+  try {
+    return f();
+  } catch (e) {
+    if (e instanceof MatrixError) throw new CalcError(e.message);
+    throw e;
+  }
 }
 
 const toRad = (env: Env, x: number) => (env.angle === "deg" ? (x * Math.PI) / 180 : x);
@@ -281,7 +325,7 @@ const yCache = new Map<string, Fn>();
 function compileY(env: Env, name: string): Fn {
   const src = env.ys[name];
   if (!src) throw new CalcError("ERR: UNDEFINED");
-  const key = `${name} ${src}`;
+  const key = `${name}\u0000${src}`;
   let fn = yCache.get(key);
   if (!fn) {
     fn = compile(parse(src));
@@ -345,6 +389,21 @@ export function compile(node: Node): Fn {
       return (env) => compileY(env, n)(env);
     }
 
+    case "matref": {
+      const n = node.name;
+      return (env) => {
+        const m = env.mats[n];
+        if (!m) throw new CalcError("ERR: UNDEFINED");
+        return m;
+      };
+    }
+
+    case "matlit": {
+      const rows = node.rows.map((row) => row.map(compile));
+      return (env) =>
+        lift(() => M.matrix(rows.map((row) => row.map((f) => num(f(env))))));
+    }
+
     case "neg": {
       const e = compile(node.e);
       return (env) => map1(e(env), (x) => -x);
@@ -353,11 +412,26 @@ export function compile(node: Node): Fn {
     case "post": {
       const e = compile(node.e);
       switch (node.op) {
-        case "²": return (env) => map1(e(env), (x) => x * x);
-        case "³": return (env) => map1(e(env), (x) => x * x * x);
+        case "²":
+          return (env) => {
+            const v = e(env);
+            if (isMatrix(v)) return lift(() => M.power(v, 2));
+            return map1(v, (x) => x * x);
+          };
+        case "³":
+          return (env) => {
+            const v = e(env);
+            if (isMatrix(v)) return lift(() => M.power(v, 3));
+            return map1(v, (x) => x * x * x);
+          };
+        case "ᵀ":
+          return (env) => lift(() => M.transpose(asMatrix(e(env))));
         case "⁻¹":
-          return (env) =>
-            map1(e(env), (x) => (x === 0 ? fail(env, "ERR: DIVIDE BY 0") : 1 / x));
+          return (env) => {
+            const v = e(env);
+            if (isMatrix(v)) return lift(() => M.inverse(v));
+            return map1(v, (x) => (x === 0 ? fail(env, "ERR: DIVIDE BY 0") : 1 / x));
+          };
         case "!":
           return (env) =>
             map1(e(env), (x) =>
@@ -372,8 +446,10 @@ export function compile(node: Node): Fn {
       const target = node.target;
       return (env) => {
         const v = e(env);
-        if (target.startsWith("L")) {
-          env.lists[target] = typeof v === "number" ? [v] : v.slice();
+        if (target.startsWith("[")) {
+          env.mats[target] = lift(() => M.clone(asMatrix(v)));
+        } else if (target.startsWith("L")) {
+          env.lists[target] = asList(v).slice();
         } else {
           env.vars[target] = num(v);
         }
@@ -387,19 +463,30 @@ export function compile(node: Node): Fn {
       switch (node.op) {
         case "+": return (env) => map2(l(env), r(env), (a, b) => a + b);
         case "-": return (env) => map2(l(env), r(env), (a, b) => a - b);
-        case "*": return (env) => map2(l(env), r(env), (a, b) => a * b);
+        case "*":
+          return (env) => {
+            const a = l(env);
+            const b = r(env);
+            // matrix × matrix is the real product, not element-wise
+            if (isMatrix(a) && isMatrix(b)) return lift(() => M.mul(a, b));
+            return map2(a, b, (x, y) => x * y);
+          };
         case "/":
-          return (env) =>
-            map2(l(env), r(env), (a, b) =>
-              b === 0 ? fail(env, "ERR: DIVIDE BY 0") : a / b,
+          return (env) => {
+            const a = l(env);
+            const b = r(env);
+            if (isMatrix(b)) throw new CalcError("ERR: DATA TYPE");
+            return map2(a, b, (x, y) =>
+              y === 0 ? fail(env, "ERR: DIVIDE BY 0") : x / y,
             );
+          };
         case "^":
-          return (env) =>
-            map2(l(env), r(env), (a, b) => {
-              if (a < 0 && !Number.isInteger(b)) return fail(env, "ERR: NONREAL ANS");
-              if (a === 0 && b < 0) return fail(env, "ERR: DIVIDE BY 0");
-              return Math.pow(a, b);
-            });
+          return (env) => {
+            const a = l(env);
+            const b = r(env);
+            if (isMatrix(a)) return lift(() => M.power(a, num(b)));
+            return map2(a, b, (x, y) => matPowScalar(env, x, y));
+          };
         case "=": return (env) => map2(l(env), r(env), (a, b) => (a === b ? 1 : 0));
         case "≠": return (env) => map2(l(env), r(env), (a, b) => (a !== b ? 1 : 0));
         case "<": return (env) => map2(l(env), r(env), (a, b) => (a < b ? 1 : 0));
@@ -431,6 +518,13 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
       return map1(arg(env), (x) => withVar(env, "X", x, body));
     };
   }
+
+  // Matrix functions need whole-value access, not element-wise mapping.
+  const MATRIX_FNS = new Set([
+    "det", "identity", "rref", "ref", "augment", "dim", "Fill", "randM",
+    "matr2list", "list2matr",
+  ]);
+  if (MATRIX_FNS.has(name)) return compileMatrixCall(node);
 
   const a = args.map(compile);
 
@@ -499,10 +593,7 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
     case "min": {
       const pick = name === "max" ? Math.max : Math.min;
       if (a.length === 2) return (env) => map2(a[0](env), a[1](env), pick);
-      return (env) => {
-        const v = a[0](env);
-        return typeof v === "number" ? v : pick(...v);
-      };
+      return (env) => pick(...asList(a[0](env)));
     }
     case "lcm":
       return (env) => map2(a[0](env), a[1](env), (x, y) => Math.abs(x * y) / gcd2(x, y));
@@ -567,6 +658,71 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
         if (!a[2]) return Array.from({ length: n + 1 }, (_, k) => cum(k));
         return map1(a[2](env), cum);
       };
+
+    default:
+      throw new CalcError("ERR: UNDEFINED");
+  }
+}
+
+function compileMatrixCall(node: Extract<Node, { t: "call" }>): Fn {
+  const { name, args } = node;
+  const a = args.map(compile);
+
+  switch (name) {
+    case "det":
+      return (env) => lift(() => M.det(asMatrix(a[0](env))));
+
+    case "identity":
+      return (env) => lift(() => M.identity(num(a[0](env))));
+
+    case "rref":
+      return (env) => lift(() => M.rref(asMatrix(a[0](env))));
+
+    case "ref":
+      return (env) => lift(() => M.ref(asMatrix(a[0](env))));
+
+    case "augment":
+      return (env) => {
+        const l = a[0](env);
+        const r = a[1](env);
+        if (isMatrix(l) && isMatrix(r)) return lift(() => M.augment(l, r));
+        // augment on two lists concatenates them
+        return [...asList(l), ...asList(r)];
+      };
+
+    case "dim":
+      return (env) => {
+        const v = a[0](env);
+        if (isMatrix(v)) return [v.r, v.c];
+        return asList(v).length;
+      };
+
+    case "randM":
+      return (env) =>
+        lift(() =>
+          M.mapMatrix(M.zeros(num(a[0](env)), num(a[1](env))), () =>
+            Math.floor(Math.random() * 19) - 9,
+          ),
+        );
+
+    case "Fill": {
+      // Fill(value, [A]) writes through to the named matrix, as on the device.
+      const target = args[1].t === "matref" ? args[1].name : null;
+      return (env) => {
+        const value = num(a[0](env));
+        const filled = lift(() => M.mapMatrix(asMatrix(a[1](env)), () => value));
+        if (target) env.mats[target] = filled;
+        return filled;
+      };
+    }
+
+    case "matr2list":
+      return (env) =>
+        lift(() => M.column(asMatrix(a[0](env)), num(a[1](env))));
+
+    case "list2matr":
+      return (env) =>
+        lift(() => M.fromColumns(a.map((f) => asList(f(env)))));
 
     default:
       throw new CalcError("ERR: UNDEFINED");
@@ -642,11 +798,10 @@ function compileSpecial(node: Extract<Node, { t: "call" }>): Fn {
   const s = args[1] ? compile(args[1]) : null;
   const e = args[2] ? compile(args[2]) : null;
   return (env) => {
-    const v = listF(env);
-    const l = typeof v === "number" ? [v] : v;
+    const l = asList(listF(env));
     const from = s ? num(s(env)) - 1 : 0;
     const to = e ? num(e(env)) : l.length;
-    return l.slice(from, to).reduce((acc, x) => acc + x, 0);
+    return l.slice(from, to).reduce((acc: number, x: number) => acc + x, 0);
   };
 }
 
@@ -663,7 +818,7 @@ function gcd2(x: number, y: number): number {
 }
 
 function stat(v: Val, f: (l: number[]) => number): number {
-  const l = typeof v === "number" ? [v] : v;
+  const l = asList(v);
   if (l.length === 0) throw new CalcError("ERR: DIM MISMATCH");
   return f(l);
 }

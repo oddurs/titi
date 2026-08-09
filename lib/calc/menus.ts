@@ -171,7 +171,10 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
           act("1‑Var Stats", "stat:1var", "on L₁"),
           act("2‑Var Stats", "stat:2var", "on L₁, L₂"),
           act("LinReg(ax+b)", "stat:linreg", "fit and store to Y₁"),
-          act("QuadReg", "stat:quadreg", "fit and store to Y₁"),
+          act("QuadReg", "stat:quadreg", "y = ax² + bx + c"),
+          act("ExpReg", "stat:expreg", "y = ab^x"),
+          act("LnReg", "stat:lnreg", "y = a + b ln x"),
+          act("PwrReg", "stat:pwrreg", "y = ax^b"),
         ],
       },
     ],
@@ -248,9 +251,27 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
     tabs: [{ name: "exec", items: [act("No programs", "app:none", "")] }],
   },
 
-  matrix: {
-    title: "matrix",
-    tabs: [{ name: "names", items: [act("No matrices", "app:none", "")] }],
+  /** The MATH tab of the MATRIX menu; NAMES and EDIT are built from state. */
+  matrixmath: {
+    title: "matrix math",
+    tabs: [
+      {
+        name: "math",
+        items: [
+          ins("det(", "det(", "determinant"),
+          ins("ᵀ", "ᵀ", "transpose"),
+          ins("dim(", "dim(", "rows and columns"),
+          ins("Fill(", "Fill(", "value, matrix"),
+          ins("identity(", "identity(", "n × n"),
+          ins("randM(", "randM(", "rows, columns"),
+          ins("augment(", "augment(", "side by side"),
+          ins("Matr▸list(", "Matr▸list(", "matrix, column"),
+          ins("List▸matr(", "List▸matr(", "lists to columns"),
+          ins("rref(", "rref(", "reduced row echelon"),
+          ins("ref(", "ref(", "row echelon"),
+        ],
+      },
+    ],
   },
 
   mem: {

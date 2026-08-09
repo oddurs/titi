@@ -28,19 +28,35 @@ npm run build      # static export to ./out
 `STO▸`. Answers carry ten significant digits and drop the leading zero, so `7÷8`
 reads `.875`.
 
-**Graphing.** Six functions with independent colour and line style. Per-pixel
-adaptive sampling with pole detection, so `tan(X)` breaks at its asymptotes
-instead of drawing vertical lines. Drag to pan, wheel or pinch to zoom, drag to
-trace. The full `ZOOM` menu including `ZBox`, `ZSquare` and `ZoomFit`.
+**Graphing.** Function, parametric and polar, chosen under `MODE`. The six
+slots are reinterpreted rather than duplicated: `Y₁`–`Y₆` in function mode,
+`r₁`–`r₆` in polar, and pairs of `Xₙₜ`/`Yₙₜ` in parametric. Per-pixel adaptive
+sampling with pole detection, so `tan(X)` breaks at its asymptotes instead of
+drawing vertical lines. Drag to pan, wheel or pinch to zoom, drag to trace. The
+full `ZOOM` menu including `ZBox`, `ZSquare` and a `ZoomFit` that fits both axes
+when the mode calls for it.
+
+**Matrices.** `[A]`–`[J]` with a dimension-aware editor, and literals like
+`[[1,2][3,4]]` typed straight into an expression. Products, powers, scalar
+broadcast, `det(`, inverse via `x⁻¹`, transpose via `ᵀ`, `rref(`, `ref(`,
+`augment(`, `identity(`, `dim(`, `Fill(`, `randM(`, and conversion to and from
+lists. Solve a system with `[A]⁻¹[B]` or `rref(augment([A],[B]))`.
+
+**Programs.** A TI-BASIC interpreter with `Disp`, `Input`, `Prompt`, `Output(`,
+`If`/`Then`/`Else`, `For(`, `While`, `Repeat`, `Lbl`/`Goto`, `Pause`, `Stop`,
+`Return`, `DelVar`, `ClrHome` and `prgm` calls into other programs. It suspends
+rather than blocking, so input prompts are real. `QUADRAT`, `COLLATZ` and `FIB`
+ship with it; `PRGM ▸ NEW` writes your own.
 
 **Calculus and analysis.** `CALC` gives zero, minimum, maximum, intersect,
 `dy/dx` and `∫f(x)dx` with shaded area — backed by Brent's method,
 golden-section search and adaptive Simpson quadrature. `nDeriv(`, `fnInt(` and
 `solve(` are available as expressions too.
 
-**Statistics.** A six-list editor, 1-Var and 2-Var stats, `LinReg(ax+b)` and
-`QuadReg` that write their fit back into `Y₁`, plus scatter and xyLine stat
-plots. Normal and binomial distributions under `DISTR`.
+**Statistics.** A six-list editor, 1-Var and 2-Var stats, and five regressions —
+`LinReg(ax+b)`, `QuadReg`, `ExpReg`, `LnReg` and `PwrReg` — each writing its fit
+back into `Y₁`. Scatter and xyLine stat plots. Normal and binomial
+distributions under `DISTR`.
 
 **Tables and modes.** `TABLE` with `TBLSET`, and `MODE` for Normal/Sci/Eng,
 Float/Fix, Radian/Degree, Connected/Dot, grid, labels and coordinates.
@@ -69,19 +85,25 @@ lib/
     lexer.ts         longest-match tokeniser with source spans
     parser.ts        precedence climbing, TI's associativity rules
     eval.ts          AST → (env) => value, plus root/integral solvers
+    matrix.ts        dense real linear algebra
+    program.ts       the suspendable TI-BASIC interpreter
     format.ts        ten-significant-digit display, ▸Frac
-    stats.ts         1-Var, 2-Var, LinReg, QuadReg
+    stats.ts         1-Var, 2-Var, and five regressions
   calc/
     store.ts         the device state machine (zustand)
+    curves.ts        one parameterisation for all three graph modes
     keys.ts          the faceplate as data
     menus.ts         menu descriptors
     analysis.ts      zero, extremum and intersection search
 scripts/
-  engine.test.ts     60 assertions over the math engine
+  test.ts            runs every suite and reports one total
+  harness.ts         assertions
+  *.test.ts          engine, matrix, program, stats, curves
 ```
 
-The math engine has no React or DOM dependency — `scripts/engine.test.ts` runs
-it directly under `tsx`.
+Nothing under `lib/math/` touches React or the DOM, and `lib/calc/curves.ts`
+takes its state as arguments — so the suites exercise the real code paths
+directly under `tsx`. 235 assertions at last count.
 
 ## Design
 
@@ -117,9 +139,10 @@ sites and custom domains.
 
 ## Not implemented
 
-Matrices and programs are menu stubs — both are large surfaces better built
-deliberately than faked. There is no complex-number mode, so `√(-1)` returns
-`ERR: NONREAL ANS`, as the device does in real mode.
+There is no complex-number mode, so `√(-1)` returns `ERR: NONREAL ANS`, as the
+device does in real mode. `CALC` is defined against `y(x)` and says so rather
+than guessing in parametric and polar modes. Sequence graphing, the finance
+solver and `APPS` are absent.
 
 ## License
 

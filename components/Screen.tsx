@@ -9,6 +9,8 @@ import {
   WindowEditor,
   YEditor,
 } from "./screens/ListScreens";
+import MatrixEditor from "./screens/MatrixEditor";
+import { ProgramEditor, ProgramRunner } from "./screens/ProgramScreens";
 import MenuOverlay from "./MenuOverlay";
 import Plot from "./Plot";
 import { useCalc } from "@/lib/calc/store";
@@ -22,6 +24,9 @@ const TITLES: Record<string, string> = {
   tblset: "table setup",
   mode: "mode",
   stat: "list editor",
+  matrix: "matrix editor",
+  prgm: "program editor",
+  prgmrun: "program",
   format: "format",
 };
 
@@ -60,6 +65,9 @@ export default function Screen() {
           {screen === "table" && <TableScreen />}
           {screen === "mode" && <ModeScreen />}
           {screen === "stat" && <StatEditor />}
+          {screen === "matrix" && <MatrixEditor />}
+          {screen === "prgm" && <ProgramEditor />}
+          {screen === "prgmrun" && <ProgramRunner />}
           {screen === "format" && <ModeScreen />}
 
           {message && (

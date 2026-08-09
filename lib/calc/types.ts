@@ -1,5 +1,14 @@
 import type { NotationMode } from "../math/format";
 
+export interface PrgmRun {
+  name: string;
+  output: string[];
+  /** what the interpreter is waiting for, if anything */
+  status: "input" | "pause" | "done" | "error";
+  prompt?: string;
+  message?: string;
+}
+
 export type ScreenId =
   | "home"
   | "graph"
@@ -9,6 +18,9 @@ export type ScreenId =
   | "tblset"
   | "mode"
   | "stat"
+  | "matrix"
+  | "prgm"
+  | "prgmrun"
   | "format";
 
 export type Modifier = "none" | "2nd" | "alpha" | "alpha-lock";
@@ -23,6 +35,8 @@ export interface HistoryItem {
   input: string;
   output: string;
   isError: boolean;
+  /** set when the answer was a matrix, so the tape can lay it out as a grid */
+  rows?: string[][];
 }
 
 export type PlotStyle = "line" | "thick" | "dot";
@@ -46,6 +60,10 @@ export interface GraphWindow {
   ymax: number;
   yscl: number;
   xres: number;
+  /** parameter bounds for parametric and polar modes (T and θ share them) */
+  tmin: number;
+  tmax: number;
+  tstep: number;
 }
 
 export interface TableSetup {
@@ -55,6 +73,7 @@ export interface TableSetup {
 }
 
 export interface Modes {
+  graphMode: "func" | "par" | "pol";
   angle: "rad" | "deg";
   notation: NotationMode;
   decimals: number;
@@ -118,4 +137,7 @@ export type EditTarget =
   | { kind: "yeq"; row: number }
   | { kind: "window"; row: number }
   | { kind: "tblset"; row: number }
-  | { kind: "stat"; col: number; row: number };
+  | { kind: "stat"; col: number; row: number }
+  /** row -1 addresses the dimension line, where col 0 is rows and 1 is columns */
+  | { kind: "matrix"; name: string; row: number; col: number }
+  | { kind: "prgm"; line: number };

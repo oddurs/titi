@@ -2,22 +2,34 @@
 
 import { create } from "zustand";
 import { CalcError, clearYCache, evaluate, makeEnv, sampler, type Env } from "../math/eval";
-import { formatNumber, formatValue, toFraction } from "../math/format";
+import { formatMatrixRows, formatNumber, formatValue, toFraction } from "../math/format";
+import { isMatrix } from "../math/matrix";
 import { nextBoundary, prevBoundary } from "../math/lexer";
 import { keyById } from "./keys";
 import { MENUS } from "./menus";
 import {
+  expReg,
   linReg,
+  lnReg,
   oneVarStats,
+  pwrReg,
   quadReg,
   twoVarStats,
   type StatReport,
 } from "../math/stats";
+import { buildCurves, paramRange } from "./curves";
 import {
   findExtremum,
   findIntersection,
   findZeroNear,
 } from "./analysis";
+import * as MX from "../math/matrix";
+import type { Matrix } from "../math/matrix";
+import {
+  Interpreter,
+  SAMPLE_PROGRAMS,
+  type ProgramSource,
+} from "../math/program";
 import type {
   CalcMark,
   EditTarget,
@@ -30,6 +42,7 @@ import type {
   ScreenId,
   StatPlot,
   TableSetup,
+  PrgmRun,
   TraceState,
   YFunction,
 } from "./types";
@@ -45,16 +58,32 @@ export const PLOT_COLORS = [
 
 const Y_NAMES = ["Y₁", "Y₂", "Y₃", "Y₄", "Y₅", "Y₆"];
 const LIST_NAMES = ["L₁", "L₂", "L₃", "L₄", "L₅", "L₆"];
+export const MATRIX_NAMES = "ABCDEFGHIJ".split("").map((c) => `[${c}]`);
 
 export const WINDOW_FIELDS = [
+  "tmin", "tmax", "tstep",
   "xmin", "xmax", "xscl", "ymin", "ymax", "yscl", "xres",
 ] as const;
+
+/** The parameter bounds only exist in parametric and polar modes. */
+export const visibleWindowFields = (mode: Modes["graphMode"]) =>
+  mode === "func" ? WINDOW_FIELDS.slice(3) : WINDOW_FIELDS;
 export type WindowField = (typeof WINDOW_FIELDS)[number];
 
 export const WINDOW_LABELS: Record<WindowField, string> = {
   xmin: "Xmin", xmax: "Xmax", xscl: "Xscl",
   ymin: "Ymin", ymax: "Ymax", yscl: "Yscl", xres: "Xres",
+  tmin: "Tmin", tmax: "Tmax", tstep: "Tstep",
 };
+
+/** Polar mode calls the same three fields θ rather than T. */
+export const windowLabel = (
+  field: WindowField,
+  mode: Modes["graphMode"],
+): string =>
+  mode === "pol" && field.startsWith("t")
+    ? WINDOW_LABELS[field].replace("T", "θ")
+    : WINDOW_LABELS[field];
 
 export interface ModeOption {
   key: keyof Modes;
@@ -63,6 +92,15 @@ export interface ModeOption {
 }
 
 export const MODE_ROWS: ModeOption[] = [
+  {
+    key: "graphMode",
+    hint: "what the Y= slots mean",
+    choices: [
+      { value: "func", label: "Func" },
+      { value: "par", label: "Parametric" },
+      { value: "pol", label: "Polar" },
+    ],
+  },
   {
     key: "notation",
     hint: "how answers are written",
@@ -126,9 +164,11 @@ const STANDARD_WINDOW: GraphWindow = {
   xmin: -10, xmax: 10, xscl: 1,
   ymin: -10, ymax: 10, yscl: 1,
   xres: 1,
+  tmin: 0, tmax: 2 * Math.PI, tstep: Math.PI / 48,
 };
 
 const DEFAULT_MODES: Modes = {
+  graphMode: "func",
   angle: "rad",
   notation: "normal",
   decimals: -1,
@@ -137,6 +177,12 @@ const DEFAULT_MODES: Modes = {
   grid: true,
   coordsOn: true,
 };
+
+/** A full turn of the parameter, in whatever unit the angle mode uses. */
+export function defaultParamWindow(modes: Modes) {
+  const turn = modes.angle === "deg" ? 360 : 2 * Math.PI;
+  return { tmin: 0, tmax: turn, tstep: turn / 96 };
+}
 
 function freshYs(): YFunction[] {
   return Y_NAMES.map((name, i) => ({
@@ -160,6 +206,12 @@ export interface CalcState {
   mod: Modifier;
   insertMode: boolean;
   entry: Entry;
+  /**
+   * True when the buffer was pre-filled with a field's current value and the
+   * user has not typed yet — the next character replaces it rather than
+   * appending, which is how typing over WINDOW or a matrix cell behaves.
+   */
+  entryFresh: boolean;
   target: EditTarget;
   history: HistoryItem[];
   ys: YFunction[];
@@ -171,6 +223,12 @@ export interface CalcState {
   marks: CalcMark[];
   plots: StatPlot[];
   lists: number[][];
+  mats: Record<string, Matrix>;
+  programs: ProgramSource[];
+  prgmRun: PrgmRun | null;
+  /** the program being edited, held as lines */
+  prgmLines: string[];
+  prgmName: string;
   /** row cursor for the list-style screens */
   row: number;
   col: number;
@@ -196,6 +254,15 @@ export interface CalcState {
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+/** Every regression writes its fit into Y₁, so they share one code path. */
+const REGRESSIONS: Record<string, (xs: number[], ys: number[]) => StatReport> = {
+  linreg: linReg,
+  quadreg: quadReg,
+  expreg: expReg,
+  lnreg: lnReg,
+  pwrreg: pwrReg,
+};
+
 const STORAGE_KEY = "titi.state.v1";
 
 export const useCalc = create<CalcState>((set, get) => {
@@ -211,6 +278,7 @@ export const useCalc = create<CalcState>((set, get) => {
     env.lists = Object.fromEntries(
       st.lists.map((l, i) => [LIST_NAMES[i], l]),
     );
+    env.mats = st.mats;
     clearYCache();
   }
 
@@ -220,7 +288,12 @@ export const useCalc = create<CalcState>((set, get) => {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ ys, win, modes, tbl, lists, plots, history: history.slice(-30) }),
+        JSON.stringify({
+        ys, win, modes, tbl, lists, plots,
+        mats: get().mats,
+        programs: get().programs,
+        history: history.slice(-30),
+      }),
       );
     } catch {
       /* private mode — carry on without persistence */
@@ -239,7 +312,11 @@ export const useCalc = create<CalcState>((set, get) => {
   // -- edit buffer ----------------------------------------------------------
 
   function insert(text: string) {
-    const { entry, insertMode } = get();
+    const { entry, insertMode, entryFresh } = get();
+    if (entryFresh) {
+      set({ entry: { text, caret: text.length }, entryFresh: false, message: null });
+      return;
+    }
     const before = entry.text.slice(0, entry.caret);
     const after = insertMode
       ? entry.text.slice(entry.caret)
@@ -251,11 +328,12 @@ export const useCalc = create<CalcState>((set, get) => {
   }
 
   function setEntry(text: string, caret = text.length) {
-    set({ entry: { text, caret: clamp(caret, 0, text.length) } });
+    set({ entry: { text, caret: clamp(caret, 0, text.length) }, entryFresh: false });
   }
 
   function backspace() {
     const { entry } = get();
+    set({ entryFresh: false });
     if (entry.caret === 0) return;
     const start = prevBoundary(entry.text, entry.caret);
     setEntry(
@@ -286,11 +364,13 @@ export const useCalc = create<CalcState>((set, get) => {
     const src = get().entry.text.trim();
     if (!src) return;
     const { ok, text } = evalEntry();
+    const value = env.ans;
     const item: HistoryItem = {
       id: get().history.length + 1,
       input: src,
       output: text,
       isError: !ok,
+      rows: ok && isMatrix(value) ? formatMatrixRows(value, fmt()) : undefined,
     };
     set({
       history: [...get().history, item].slice(-80),
@@ -301,9 +381,10 @@ export const useCalc = create<CalcState>((set, get) => {
     persist();
   }
 
-  function numberFromEntry(): number | null {
+  /** null means unparseable; undefined means the field was left blank. */
+  function numberFromEntry(): number | null | undefined {
     const src = get().entry.text.trim();
-    if (!src) return null;
+    if (!src) return undefined;
     try {
       const v = evaluate(src, env);
       return typeof v === "number" ? v : null;
@@ -317,7 +398,8 @@ export const useCalc = create<CalcState>((set, get) => {
     let text = "";
     if (target.kind === "yeq") text = st.ys[target.row]?.expr ?? "";
     else if (target.kind === "window") {
-      text = formatNumber(st.win[WINDOW_FIELDS[target.row]], {
+      const fields = visibleWindowFields(st.modes.graphMode);
+      text = formatNumber(st.win[fields[target.row]], {
         notation: "normal",
         decimals: -1,
       });
@@ -327,8 +409,30 @@ export const useCalc = create<CalcState>((set, get) => {
     } else if (target.kind === "stat") {
       const v = st.lists[target.col]?.[target.row];
       text = v === undefined ? "" : formatNumber(v, { notation: "normal", decimals: -1 });
+    } else if (target.kind === "matrix") {
+      const m = st.mats[target.name];
+      if (!m) text = "";
+      else if (target.row < 0) {
+        text = String(target.col === 0 ? m.r : m.c);
+      } else {
+        text = formatNumber(m.m[target.row]?.[target.col] ?? 0, {
+          notation: "normal",
+          decimals: -1,
+        });
+      }
+    } else if (target.kind === "prgm") {
+      text = st.prgmLines[target.line] ?? "";
     }
-    set({ target, entry: { text, caret: text.length } });
+    const replaceOnType =
+      target.kind === "window" ||
+      target.kind === "tblset" ||
+      target.kind === "matrix" ||
+      target.kind === "stat";
+    set({
+      target,
+      entry: { text, caret: text.length },
+      entryFresh: replaceOnType && text !== "",
+    });
   }
 
   function commitTarget() {
@@ -347,11 +451,12 @@ export const useCalc = create<CalcState>((set, get) => {
 
     if (t.kind === "window") {
       const v = numberFromEntry();
+      if (v === undefined) return;
       if (v === null) {
         note("ERR: INVALID");
         return;
       }
-      const field = WINDOW_FIELDS[t.row];
+      const field = visibleWindowFields(st.modes.graphMode)[t.row];
       const win = { ...st.win, [field]: field === "xres" ? clamp(Math.round(v), 1, 8) : v };
       set({ win, marks: [], revision: st.revision + 1 });
       persist();
@@ -360,6 +465,7 @@ export const useCalc = create<CalcState>((set, get) => {
 
     if (t.kind === "tblset") {
       const v = numberFromEntry();
+      if (v === undefined) return;
       if (v === null) {
         note("ERR: INVALID");
         return;
@@ -369,15 +475,46 @@ export const useCalc = create<CalcState>((set, get) => {
       return;
     }
 
+    if (t.kind === "matrix") {
+      const v = numberFromEntry();
+      if (v === undefined) return;
+      if (v === null) return note("ERR: INVALID");
+      const current = st.mats[t.name] ?? MX.identity(1);
+      let next: Matrix;
+      if (t.row < 0) {
+        const size = clamp(Math.round(v), 1, 12);
+        next = MX.resize(current, t.col === 0 ? size : current.r, t.col === 0 ? current.c : size);
+      } else {
+        next = MX.clone(current);
+        if (next.m[t.row] === undefined) return;
+        next.m[t.row][t.col] = v;
+      }
+      const mats = { ...st.mats, [t.name]: next };
+      set({ mats, revision: st.revision + 1 });
+      syncEnv({ mats });
+      persist();
+      return;
+    }
+
+    if (t.kind === "prgm") {
+      const lines = [...st.prgmLines];
+      lines[t.line] = st.entry.text;
+      const programs = st.programs.map((p) =>
+        p.name === st.prgmName ? { ...p, body: lines.join("\n") } : p,
+      );
+      set({ prgmLines: lines, programs });
+      persist();
+      return;
+    }
+
     if (t.kind === "stat") {
       const v = numberFromEntry();
       const lists = st.lists.map((l) => [...l]);
-      if (v === null) {
-        if (st.entry.text.trim() === "") lists[t.col].splice(t.row, 1);
-        else {
-          note("ERR: INVALID");
-          return;
-        }
+      if (v === undefined) {
+        lists[t.col].splice(t.row, 1);
+      } else if (v === null) {
+        note("ERR: INVALID");
+        return;
       } else {
         lists[t.col][t.row] = v;
         for (let i = 0; i < lists[t.col].length; i++) lists[t.col][i] ??= 0;
@@ -397,7 +534,8 @@ export const useCalc = create<CalcState>((set, get) => {
       loadEditTarget({ kind: "yeq", row: clamp(t.row + delta, 0, 5) });
       set({ row: clamp(t.row + delta, 0, 5) });
     } else if (t.kind === "window") {
-      const row = clamp(t.row + delta, 0, WINDOW_FIELDS.length - 1);
+      const count = visibleWindowFields(get().modes.graphMode).length;
+      const row = clamp(t.row + delta, 0, count - 1);
       loadEditTarget({ kind: "window", row });
       set({ row });
     } else if (t.kind === "tblset") {
@@ -409,7 +547,46 @@ export const useCalc = create<CalcState>((set, get) => {
       const row = clamp(t.row + delta, 0, maxRow);
       loadEditTarget({ kind: "stat", col: t.col, row });
       set({ row });
+    } else if (t.kind === "matrix") {
+      const m = get().mats[t.name];
+      const row = clamp(t.row + delta, -1, (m?.r ?? 1) - 1);
+      const col = row < 0 ? Math.min(t.col, 1) : Math.min(t.col, (m?.c ?? 1) - 1);
+      loadEditTarget({ kind: "matrix", name: t.name, row, col });
+    } else if (t.kind === "prgm") {
+      const line = clamp(t.line + delta, 0, Math.max(0, st.prgmLines.length - 1));
+      loadEditTarget({ kind: "prgm", line });
     }
+  }
+
+  function moveMatCol(delta: number): boolean {
+    const st = get();
+    if (st.target.kind !== "matrix") return false;
+    commitTarget();
+    const t = st.target;
+    const m = get().mats[t.name];
+    const width = t.row < 0 ? 2 : (m?.c ?? 1);
+    const col = clamp(t.col + delta, 0, width - 1);
+    loadEditTarget({ kind: "matrix", name: t.name, row: t.row, col });
+    return true;
+  }
+
+  /** ENTER fills a matrix left to right, then drops to the next row. */
+  function advanceMatrixCell() {
+    const t = get().target;
+    if (t.kind !== "matrix") return;
+    const m = get().mats[t.name];
+    if (!m) return;
+    if (t.row < 0) {
+      loadEditTarget({ kind: "matrix", name: t.name, row: t.col === 0 ? -1 : 0, col: t.col === 0 ? 1 : 0 });
+      return;
+    }
+    let row = t.row;
+    let col = t.col + 1;
+    if (col >= m.c) {
+      col = 0;
+      row = Math.min(row + 1, m.r - 1);
+    }
+    loadEditTarget({ kind: "matrix", name: t.name, row, col });
   }
 
   function moveCol(delta: number) {
@@ -425,7 +602,7 @@ export const useCalc = create<CalcState>((set, get) => {
 
   // -- screens --------------------------------------------------------------
 
-  function gotoScreen(screen: ScreenId) {
+  function gotoScreen(screen: ScreenId, matrixName?: string) {
     const st = get();
     if (st.target.kind !== "home") commitTarget();
 
@@ -441,22 +618,45 @@ export const useCalc = create<CalcState>((set, get) => {
     } else if (screen === "stat") {
       set({ screen, menu: null, row: 0, col: 0 });
       loadEditTarget({ kind: "stat", col: 0, row: 0 });
+    } else if (screen === "matrix") {
+      const name =
+        matrixName ?? (st.target.kind === "matrix" ? st.target.name : MATRIX_NAMES[0]);
+      if (!get().mats[name]) {
+        const mats = { ...get().mats, [name]: MX.identity(2) };
+        set({ mats });
+        syncEnv({ mats });
+      }
+      set({ screen, menu: null });
+      loadEditTarget({ kind: "matrix", name, row: 0, col: 0 });
+    } else if (screen === "prgm") {
+      set({ screen, menu: null });
+      loadEditTarget({ kind: "prgm", line: 0 });
     } else if (screen === "table") {
       // The table's row is a scroll offset, not a field cursor — start at TblStart.
       set({ screen, menu: null, row: 0, target: { kind: "home" } });
     } else if (screen === "home") {
-      set({ screen, menu: null, target: { kind: "home" }, entry: { text: "", caret: 0 } });
+      set({
+        screen,
+        menu: null,
+        target: { kind: "home" },
+        entry: { text: "", caret: 0 },
+        entryFresh: false,
+      });
     } else {
-      set({ screen, menu: null, target: { kind: "home" } });
+      set({ screen, menu: null, target: { kind: "home" }, entryFresh: false });
     }
   }
 
   // -- graph helpers --------------------------------------------------------
 
   function enabledYs(): { index: number; y: YFunction }[] {
-    return get()
-      .ys.map((y, index) => ({ index, y }))
-      .filter(({ y }) => y.on && y.expr.trim() !== "");
+    const st = get();
+    // In parametric mode a curve owns two slots, so ask the curve builder
+    // rather than reading the slots directly.
+    const drawn = new Set(buildCurves(st.ys, st.modes, env).map((c) => c.index));
+    return st.ys
+      .map((y, index) => ({ index, y }))
+      .filter(({ index }) => drawn.has(index));
   }
 
   function makeSampler(index: number): ((x: number) => number) | null {
@@ -521,27 +721,38 @@ export const useCalc = create<CalcState>((set, get) => {
         break;
       }
       case "fit": {
-        let lo = Infinity;
-        let hi = -Infinity;
-        for (const { index } of enabledYs()) {
-          const f = makeSampler(index);
-          if (!f) continue;
-          for (let i = 0; i <= 300; i++) {
-            const x = w.xmin + ((w.xmax - w.xmin) * i) / 300;
-            const y = f(x);
-            if (Number.isFinite(y)) {
-              lo = Math.min(lo, y);
-              hi = Math.max(hi, y);
-            }
-          }
-        }
-        if (!Number.isFinite(lo) || lo === hi) {
+        // Fit whatever the current mode actually draws: function mode keeps
+        // the x window and fits y, the others fit both axes.
+        const curves = buildCurves(st.ys, st.modes, env);
+        if (!curves.length) {
           note("ERR: NO FUNCTIONS");
           set({ menu: null });
           break;
         }
-        const pad = (hi - lo) * 0.1;
-        set({ win: { ...w, ymin: lo - pad, ymax: hi + pad }, screen: "graph", menu: null });
+        const { min, max } = paramRange(st.modes.graphMode, w);
+        let xLo = Infinity, xHi = -Infinity, yLo = Infinity, yHi = -Infinity;
+        for (const c of curves) {
+          for (let i = 0; i <= 400; i++) {
+            const t = min + ((max - min) * i) / 400;
+            const p = c.at(t);
+            if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+            xLo = Math.min(xLo, p.x); xHi = Math.max(xHi, p.x);
+            yLo = Math.min(yLo, p.y); yHi = Math.max(yHi, p.y);
+          }
+        }
+        if (!Number.isFinite(yLo) || yLo === yHi) {
+          note("ERR: NO FUNCTIONS");
+          set({ menu: null });
+          break;
+        }
+        const padY = (yHi - yLo) * 0.1 || 1;
+        const next = { ...w, ymin: yLo - padY, ymax: yHi + padY };
+        if (st.modes.graphMode !== "func" && Number.isFinite(xLo) && xLo !== xHi) {
+          const padX = (xHi - xLo) * 0.1 || 1;
+          next.xmin = xLo - padX;
+          next.xmax = xHi + padX;
+        }
+        set({ win: next, screen: "graph", menu: null });
         break;
       }
       case "in":
@@ -572,6 +783,10 @@ export const useCalc = create<CalcState>((set, get) => {
 
   function runCalc(op: string) {
     const st = get();
+    if (st.modes.graphMode !== "func") {
+      set({ menu: null, screen: "graph" });
+      return note("CALC needs Func mode");
+    }
     const idx = currentTraceFn();
     if (idx < 0) {
       note("ERR: NO FUNCTIONS");
@@ -646,7 +861,7 @@ export const useCalc = create<CalcState>((set, get) => {
 
     if (p.op === "value") {
       const x = numberFromEntry();
-      if (x === null || !f) {
+      if (x === null || x === undefined || !f) {
         note("ERR: INVALID");
         return true;
       }
@@ -705,12 +920,17 @@ export const useCalc = create<CalcState>((set, get) => {
       note("ERR: NO FUNCTIONS");
       return;
     }
-    const { win, trace } = get();
+    const st = get();
+    const mode = st.modes.graphMode;
+    const start =
+      mode === "func"
+        ? (st.win.xmin + st.win.xmax) / 2
+        : paramRange(mode, st.win).min;
     set({
       screen: "graph",
       menu: null,
       cursor: null,
-      trace: trace ?? { fn: active[0].index, x: (win.xmin + win.xmax) / 2 },
+      trace: st.trace ?? { fn: active[0].index, x: start },
       message: null,
     });
   }
@@ -718,10 +938,16 @@ export const useCalc = create<CalcState>((set, get) => {
   function stepTrace(dir: number) {
     const st = get();
     if (!st.trace) return false;
-    const step = ((st.win.xmax - st.win.xmin) / 94) * st.win.xres;
-    set({
-      trace: { ...st.trace, x: clamp(st.trace.x + dir * step, st.win.xmin, st.win.xmax) },
-    });
+    const mode = st.modes.graphMode;
+    if (mode === "func") {
+      const step = ((st.win.xmax - st.win.xmin) / 94) * st.win.xres;
+      set({
+        trace: { ...st.trace, x: clamp(st.trace.x + dir * step, st.win.xmin, st.win.xmax) },
+      });
+      return true;
+    }
+    const { min, max, step } = paramRange(mode, st.win);
+    set({ trace: { ...st.trace, x: clamp(st.trace.x + dir * step, min, max) } });
     return true;
   }
 
@@ -750,9 +976,9 @@ export const useCalc = create<CalcState>((set, get) => {
       } else if (kind === "2var") {
         if (l1.length < 2 || l1.length !== l2.length) throw new CalcError("ERR: DIM MISMATCH");
         set({ statReport: twoVarStats(l1, l2), screen: "home" });
-      } else if (kind === "linreg" || kind === "quadreg") {
+      } else if (REGRESSIONS[kind]) {
         if (l1.length < 2 || l1.length !== l2.length) throw new CalcError("ERR: DIM MISMATCH");
-        const report = kind === "linreg" ? linReg(l1, l2) : quadReg(l1, l2);
+        const report = REGRESSIONS[kind](l1, l2);
         const ys = st.ys.map((y, i) => (i === 0 ? { ...y, expr: report.expr!, on: true } : y));
         set({ statReport: report, ys, screen: "home", revision: st.revision + 1 });
         syncEnv({ ys });
@@ -780,9 +1006,153 @@ export const useCalc = create<CalcState>((set, get) => {
     }
   }
 
+  /** Applying modes may need to reset the parameter window and clear marks. */
+  function applyModes(modes: Modes) {
+    const st = get();
+    const changedGraph = modes.graphMode !== st.modes.graphMode;
+    const changedAngle = modes.angle !== st.modes.angle;
+    const win =
+      changedGraph || changedAngle
+        ? { ...st.win, ...defaultParamWindow(modes) }
+        : st.win;
+    set({
+      modes,
+      win,
+      trace: null,
+      marks: [],
+      revision: st.revision + 1,
+    });
+    syncEnv({ modes });
+    persist();
+  }
+
+  // -- programs ---------------------------------------------------------------
+
+  /** The live interpreter is deliberately outside reactive state. */
+  let vm: Interpreter | null = null;
+
+  function pumpProgram() {
+    if (!vm) return;
+    const st = get();
+    const status = vm.run();
+    const base = { name: st.prgmRun?.name ?? "", output: [...vm.output] };
+
+    if (status.kind === "input") {
+      set({
+        prgmRun: { ...base, status: "input", prompt: status.prompt },
+        entry: { text: "", caret: 0 },
+      });
+    } else if (status.kind === "pause") {
+      set({ prgmRun: { ...base, status: "pause" } });
+    } else if (status.kind === "error") {
+      set({ prgmRun: { ...base, status: "error", message: status.message } });
+      vm = null;
+    } else {
+      set({ prgmRun: { ...base, status: "done" } });
+      vm = null;
+    }
+    // A program can store into Y-vars, lists or matrices.
+    set({ mats: { ...env.mats }, revision: get().revision + 1 });
+    persist();
+  }
+
+  function startProgram(name: string) {
+    const st = get();
+    const src = st.programs.find((p) => p.name === name);
+    if (!src) return note("ERR: UNDEFINED");
+    syncEnv();
+    vm = new Interpreter(
+      src,
+      env,
+      { notation: st.modes.notation, decimals: st.modes.decimals },
+      (n) => get().programs.find((p) => p.name === n),
+    );
+    set({
+      screen: "prgmrun",
+      menu: null,
+      message: null,
+      target: { kind: "home" },
+      entry: { text: "", caret: 0 },
+      prgmRun: { name, output: [], status: "pause" },
+    });
+    pumpProgram();
+  }
+
+  function editProgram(name: string) {
+    const src = get().programs.find((p) => p.name === name);
+    if (!src) return note("ERR: UNDEFINED");
+    const lines = src.body.split("\n");
+    set({ prgmName: name, prgmLines: lines.length ? lines : [""], menu: null });
+    gotoScreen("prgm");
+  }
+
+  function newProgram() {
+    const st = get();
+    let n = 1;
+    while (st.programs.some((p) => p.name === `PRGM${n}`)) n += 1;
+    const name = `PRGM${n}`;
+    const programs = [...st.programs, { name, body: "" }];
+    set({ programs, prgmName: name, prgmLines: [""], menu: null });
+    persist();
+    gotoScreen("prgm");
+  }
+
   // -- menus ----------------------------------------------------------------
 
   function openMenu(name: string) {
+    // PRGM and MATRIX list what actually exists, so their tabs are built here.
+    if (name === "prgm") {
+      const programs = get().programs;
+      const rows = (verb: string) =>
+        programs.length
+          ? programs.map((p) => ({ label: p.name, action: `prgm:${verb}:${p.name}` }))
+          : [{ label: "No programs", action: "noop", hint: "create one under NEW" }];
+      set({
+        menu: {
+          title: "prgm",
+          tabs: [
+            { name: "exec", items: rows("exec") },
+            { name: "edit", items: rows("edit") },
+            { name: "new", items: [{ label: "Create program", action: "prgm:new" }] },
+          ],
+          tab: 0,
+          index: 0,
+        },
+      });
+      return;
+    }
+
+    if (name === "matrix") {
+      const mats = get().mats;
+      set({
+        menu: {
+          title: "matrix",
+          tabs: [
+            {
+              name: "names",
+              items: MATRIX_NAMES.map((n) => ({
+                label: n,
+                insert: n,
+                hint: mats[n] ? `${mats[n].r}×${mats[n].c}` : "empty",
+              })),
+            },
+            { name: "math", items: MENUS.matrixmath.tabs[0].items },
+            {
+              name: "edit",
+              items: MATRIX_NAMES.map((n) => ({
+                label: n,
+                action: `mat:edit:${n}`,
+                hint: mats[n] ? `${mats[n].r}×${mats[n].c}` : "empty",
+              })),
+            },
+          ],
+          tab: 0,
+          index: 0,
+        },
+      });
+      return;
+    }
+
     const def = MENUS[name];
     if (!def) return;
     set({ menu: { title: def.title, tabs: def.tabs, tab: 0, index: 0 } });
@@ -850,6 +1220,19 @@ export const useCalc = create<CalcState>((set, get) => {
         insert(formatNumber(v, { notation: "normal", decimals: -1 }));
         return;
       }
+      case "prgm":
+        if (arg === "exec") startProgram(arg2);
+        else if (arg === "edit") editProgram(arg2);
+        else if (arg === "new") newProgram();
+        return;
+
+      case "mat": {
+        // mat:edit:[A]
+        set({ menu: null });
+        gotoScreen("matrix", action.slice("mat:edit:".length));
+        return;
+      }
+
       case "draw":
         set({ marks: [], graphPrompt: null, revision: st.revision + 1, message: null });
         return;
@@ -940,6 +1323,19 @@ export const useCalc = create<CalcState>((set, get) => {
           set({ marks: [], trace: null, cursor: null, message: null, revision: st.revision + 1 });
           return;
         }
+        if (st.screen === "prgm" && st.target.kind === "prgm" && !st.entry.text) {
+          // clearing an already-empty line removes it
+          const at = st.target.line;
+          const lines = st.prgmLines.filter((_, i) => i !== at);
+          const next = lines.length ? lines : [""];
+          const programs = st.programs.map((p) =>
+            p.name === st.prgmName ? { ...p, body: next.join("\n") } : p,
+          );
+          set({ prgmLines: next, programs });
+          persist();
+          loadEditTarget({ kind: "prgm", line: clamp(at, 0, next.length - 1) });
+          return;
+        }
         if (st.entry.text) {
           setEntry("");
           set({ message: null });
@@ -956,6 +1352,32 @@ export const useCalc = create<CalcState>((set, get) => {
 
       case "enter":
         if (st.menu) return chooseMenuItem();
+        if (st.screen === "prgmrun") {
+          const run = st.prgmRun;
+          if (!run) return gotoScreen("home");
+          if (run.status === "input") {
+            vm?.provideInput(st.entry.text);
+            set({ entry: { text: "", caret: 0 } });
+            return pumpProgram();
+          }
+          if (run.status === "pause") {
+            vm?.resume();
+            return pumpProgram();
+          }
+          // done or error — ENTER returns to the home screen
+          set({ prgmRun: null });
+          return gotoScreen("home");
+        }
+        if (st.target.kind === "prgm") {
+          // ENTER opens a new line below, the way the program editor works
+          commitTarget();
+          const lines = [...get().prgmLines];
+          const at = st.target.line;
+          lines.splice(at + 1, 0, "");
+          set({ prgmLines: lines });
+          loadEditTarget({ kind: "prgm", line: at + 1 });
+          return;
+        }
         if (st.screen === "graph") {
           if (resolveGraphPrompt()) return;
           return;
@@ -964,6 +1386,11 @@ export const useCalc = create<CalcState>((set, get) => {
           if (st.graphPrompt) return void resolveGraphPrompt();
           commitHome();
           set({ screen: "home", statReport: null });
+          return;
+        }
+        if (st.target.kind === "matrix") {
+          commitTarget();
+          advanceMatrixCell();
           return;
         }
         commitTarget();
@@ -1009,9 +1436,7 @@ export const useCalc = create<CalcState>((set, get) => {
           const cur = row.choices.findIndex((c) => c.value === st.modes[row.key]);
           const next = clamp(cur + dir, 0, row.choices.length - 1);
           const modes = { ...st.modes, [row.key]: row.choices[next].value } as Modes;
-          set({ modes, revision: st.revision + 1 });
-          syncEnv({ modes });
-          persist();
+          applyModes(modes);
           return;
         }
         if (st.screen === "graph") {
@@ -1023,11 +1448,12 @@ export const useCalc = create<CalcState>((set, get) => {
           });
         }
         if (st.screen === "stat" && moveCol(dir)) return;
+        if (st.screen === "matrix" && moveMatCol(dir)) return;
         // Within an edit buffer the arrows walk the caret token by token.
         const { entry } = get();
         const caret =
           dir < 0 ? prevBoundary(entry.text, entry.caret) : nextBoundary(entry.text, entry.caret);
-        set({ entry: { ...entry, caret } });
+        set({ entry: { ...entry, caret }, entryFresh: false });
         return;
       }
 
@@ -1041,6 +1467,11 @@ export const useCalc = create<CalcState>((set, get) => {
           win: { ...STANDARD_WINDOW },
           modes: { ...DEFAULT_MODES },
           lists: Array.from({ length: 6 }, () => [] as number[]),
+          mats: { "[A]": MX.identity(2) },
+          programs: SAMPLE_PROGRAMS.map((p) => ({ ...p })),
+          prgmRun: null,
+          prgmLines: [],
+          prgmName: "",
           plots: freshPlots(),
           marks: [],
           trace: null,
@@ -1064,6 +1495,7 @@ export const useCalc = create<CalcState>((set, get) => {
     mod: "none",
     insertMode: true,
     entry: { text: "", caret: 0 },
+    entryFresh: false,
     target: { kind: "home" },
     history: [],
     ys: freshYs(),
@@ -1075,6 +1507,11 @@ export const useCalc = create<CalcState>((set, get) => {
     marks: [],
     plots: freshPlots(),
     lists: Array.from({ length: 6 }, () => [] as number[]),
+    mats: { "[A]": MX.identity(2) },
+    programs: SAMPLE_PROGRAMS.map((p) => ({ ...p })),
+    prgmRun: null,
+    prgmLines: [],
+    prgmName: "",
     row: 0,
     col: 0,
     cursor: null,
@@ -1147,11 +1584,17 @@ export const useCalc = create<CalcState>((set, get) => {
           const saved = JSON.parse(raw);
           set({
             ys: saved.ys ?? freshYs(),
-            win: saved.win ?? { ...STANDARD_WINDOW },
+            // Merge over the defaults: a save from an older version has no
+            // parameter window, and NaN bounds would blank the graph.
+            win: { ...STANDARD_WINDOW, ...(saved.win ?? {}) },
             modes: { ...DEFAULT_MODES, ...(saved.modes ?? {}) },
             tbl: saved.tbl ?? { start: 0, step: 1, auto: true },
             lists: saved.lists ?? Array.from({ length: 6 }, () => [] as number[]),
             plots: saved.plots ?? freshPlots(),
+            mats: saved.mats ?? { "[A]": MX.identity(2) },
+            programs: saved.programs?.length
+              ? saved.programs
+              : SAMPLE_PROGRAMS.map((p) => ({ ...p })),
             history: saved.history ?? [],
           });
         }

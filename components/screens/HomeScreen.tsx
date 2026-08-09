@@ -41,6 +41,25 @@ function QuickStart() {
   );
 }
 
+/** A matrix answer gets real brackets and columns rather than one long line. */
+function MatrixAnswer({ rows }: { rows: string[][] }) {
+  return (
+    <span className="mat-answer">
+      <span className="mat-bracket" aria-hidden />
+      <span className="mat-answer-grid">
+        {rows.map((row, i) => (
+          <span className="mat-answer-row" key={i}>
+            {row.map((cell, j) => (
+              <span key={j}>{cell}</span>
+            ))}
+          </span>
+        ))}
+      </span>
+      <span className="mat-bracket" data-side="right" aria-hidden />
+    </span>
+  );
+}
+
 export default function HomeScreen() {
   const history = useCalc((s) => s.history);
   const entry = useCalc((s) => s.entry);
@@ -66,7 +85,13 @@ export default function HomeScreen() {
                 <MathText text={h.input} />
               </div>
               <div className="hist-out" data-error={h.isError}>
-                {h.isError ? h.output : <AnswerText value={h.output} />}
+                {h.isError ? (
+                  h.output
+                ) : h.rows ? (
+                  <MatrixAnswer rows={h.rows} />
+                ) : (
+                  <AnswerText value={h.output} />
+                )}
               </div>
             </div>
           ))}

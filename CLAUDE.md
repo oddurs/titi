@@ -7,18 +7,25 @@ static export, no server. Read `README.md` first for what it does.
 
 ```bash
 npm run dev        # http://localhost:9991 — always use this port
-npm run check      # typecheck + lint + engine tests; run before declaring done
-npm test           # engine tests alone (fast, no browser)
+npm run check      # typecheck + lint + tests; run before declaring done
+npm test           # every suite in one process, one total
 npm run build      # static export to ./out
 ```
+
+Suites live in `scripts/` and share `harness.ts`. Each ends with
+`reportIfMain(import.meta.url)` so it reports when run alone and stays quiet
+when `scripts/test.ts` imports it. Run one directly with
+`npx tsx scripts/matrix.test.ts`.
 
 ## Architecture
 
 Three layers, and the boundaries matter:
 
-1. **`lib/math/`** — pure. Lexer → parser → AST → compiled closures. No React,
-   no DOM, no store import. `scripts/engine.test.ts` runs it directly under
-   `tsx`, which is why it must stay pure.
+1. **`lib/math/`** — pure. Lexer → parser → AST → compiled closures, plus
+   `matrix.ts` and the `program.ts` interpreter. No React, no DOM, no store
+   import. The suites run it directly under `tsx`, which is why it must stay
+   pure. `lib/calc/curves.ts` follows the same rule: it takes state as
+   arguments so the graph modes are testable without a canvas.
 2. **`lib/calc/`** — the device state machine. One zustand store owns every
    screen, the edit buffer, modifier state and menus. `press(keyId)` is the
    single entry point for input; UI components dispatch into it and never
@@ -48,6 +55,25 @@ Keep it that way; two-dimensional editing is not worth the complexity.
 **DEL and the arrows move by token, not character.** `prevBoundary` /
 `nextBoundary` in `lib/math/lexer.ts` do this, so `sin(` disappears in one press.
 
+**Values are `number | number[] | Matrix`.** `map1`/`map2` in `eval.ts` handle
+all three, so element-wise operations work on matrices for free. Matrix × matrix
+is the real product and is special-cased; division by a matrix is a data-type
+error rather than an inverse.
+
+**The program interpreter suspends, it does not block.** `run()` returns a
+status; the store supplies input and calls `run()` again. The live `Interpreter`
+lives in a closure variable in the store, not in reactive state — putting it in
+state would clone it on every set.
+
+**Graph modes reinterpret the same six Y slots.** `lib/calc/curves.ts` turns
+them into parameterised curves; the plotter, trace and ZoomFit all consume that
+rather than reading slots directly. Add a mode there, not in `Plot.tsx`.
+
+**`entryFresh` makes typing replace a pre-filled field.** Set when a WINDOW,
+matrix or stat cell loads its current value; the first keystroke replaces
+rather than appends. Clear it whenever you set `entry` outside
+`loadEditTarget`, or it leaks into the next screen.
+
 **Screens share one edit buffer.** `entry` plus `target` says where ENTER
 commits. `row` is a cursor on list screens but a scroll offset on the table —
 reset it when entering the table.
@@ -67,6 +93,9 @@ Do not "fix" these — they are tested:
 - Answers show ten significant digits with no leading zero: `.875`, `.3333333333`
 - Trailing parens are optional: `sin(X` parses
 - Errors are TI strings: `ERR: SYNTAX`, `ERR: DOMAIN`, `ERR: NONREAL ANS`
+- A bare trailing `Y` or `L` is a variable, not `Y₁`/`L₁` — the subscript must
+  actually be present (`"".includes()` is true for every string, which is how
+  that bug got in)
 
 ## CSS
 
@@ -101,5 +130,5 @@ Note that a key's accessible name follows the armed modifier: after pressing
 
 ## Scope
 
-Matrices and programs are intentional stubs. There is no complex-number mode.
-If asked to add either, treat it as a real feature, not a patch.
+No complex-number mode; it would touch every numeric path. No sequence
+graphing, finance solver or APPS. `CALC` is function-mode only and says so.

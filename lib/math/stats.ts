@@ -100,6 +100,91 @@ export function linReg(xs: number[], ys: number[]): StatReport {
   };
 }
 
+/**
+ * The three transform-and-fit regressions. Each linearises the data, runs the
+ * same least-squares line, then maps the coefficients back.
+ *   ExpReg  y = ab^x   fits ln y against x
+ *   LnReg   y = a + b ln x
+ *   PwrReg  y = ax^b   fits ln y against ln x
+ */
+function transformedFit(
+  xs: number[],
+  ys: number[],
+  fx: (x: number) => number,
+  fy: (y: number) => number,
+): { slope: number; intercept: number; r: number } {
+  const n = xs.length;
+  const u = xs.map(fx);
+  const v = ys.map(fy);
+  if (u.some((x) => !Number.isFinite(x)) || v.some((y) => !Number.isFinite(y))) {
+    throw new Error("ERR: DOMAIN");
+  }
+  const su = u.reduce((s, x) => s + x, 0);
+  const sv = v.reduce((s, y) => s + y, 0);
+  const suv = u.reduce((s, x, i) => s + x * v[i], 0);
+  const su2 = u.reduce((s, x) => s + x * x, 0);
+  const sv2 = v.reduce((s, y) => s + y * y, 0);
+
+  const denom = n * su2 - su * su;
+  const slope = denom === 0 ? 0 : (n * suv - su * sv) / denom;
+  const intercept = (sv - slope * su) / n;
+  const r =
+    (n * suv - su * sv) /
+    Math.sqrt(Math.max(1e-300, (n * su2 - su * su) * (n * sv2 - sv * sv)));
+  return { slope, intercept, r };
+}
+
+export function expReg(xs: number[], ys: number[]): StatReport {
+  if (ys.some((y) => y <= 0)) throw new Error("ERR: DOMAIN");
+  const { slope, intercept, r } = transformedFit(xs, ys, (x) => x, Math.log);
+  const a = Math.exp(intercept);
+  const b = Math.exp(slope);
+  return {
+    title: "ExpReg  y = ab^x",
+    rows: [
+      { label: "a", value: f(a) },
+      { label: "b", value: f(b), hint: "growth factor" },
+      { label: "r²", value: f(r * r) },
+      { label: "r", value: f(r) },
+      { label: "→", value: "Y₁", hint: "stored" },
+    ],
+    expr: `${f(a)}*${f(b)}^X`,
+  };
+}
+
+export function lnReg(xs: number[], ys: number[]): StatReport {
+  if (xs.some((x) => x <= 0)) throw new Error("ERR: DOMAIN");
+  const { slope, intercept, r } = transformedFit(xs, ys, Math.log, (y) => y);
+  return {
+    title: "LnReg  y = a + b ln x",
+    rows: [
+      { label: "a", value: f(intercept) },
+      { label: "b", value: f(slope) },
+      { label: "r²", value: f(r * r) },
+      { label: "r", value: f(r) },
+      { label: "→", value: "Y₁", hint: "stored" },
+    ],
+    expr: `${f(intercept)}+${f(slope)}*ln(X)`.replace("+-", "-"),
+  };
+}
+
+export function pwrReg(xs: number[], ys: number[]): StatReport {
+  if (xs.some((x) => x <= 0) || ys.some((y) => y <= 0)) throw new Error("ERR: DOMAIN");
+  const { slope, intercept, r } = transformedFit(xs, ys, Math.log, Math.log);
+  const a = Math.exp(intercept);
+  return {
+    title: "PwrReg  y = ax^b",
+    rows: [
+      { label: "a", value: f(a) },
+      { label: "b", value: f(slope), hint: "exponent" },
+      { label: "r²", value: f(r * r) },
+      { label: "r", value: f(r) },
+      { label: "→", value: "Y₁", hint: "stored" },
+    ],
+    expr: `${f(a)}*X^${f(slope)}`,
+  };
+}
+
 /** Least squares quadratic via the normal equations, solved by elimination. */
 export function quadReg(xs: number[], ys: number[]): StatReport {
   const n = xs.length;

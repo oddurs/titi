@@ -21,6 +21,9 @@ const ARITY: Record<string, [number, number]> = {
   nDeriv: [3, 4], fnInt: [4, 5], sum: [1, 3], seq: [4, 5],
   mean: [1, 2], median: [1, 2], stdDev: [1, 2], variance: [1, 2],
   randInt: [2, 3], pow10: [1, 1], expe: [1, 1], conj: [1, 1],
+  det: [1, 1], identity: [1, 1], rref: [1, 1], ref: [1, 1],
+  augment: [2, 2], dim: [1, 1], Fill: [2, 2], randM: [2, 2],
+  matr2list: [2, 2], list2matr: [1, 9],
   normalpdf: [1, 3], normalcdf: [2, 4], invNorm: [1, 3],
   binompdf: [2, 3], binomcdf: [2, 3], solve: [2, 4],
 };
@@ -69,7 +72,13 @@ class Parser {
     if (this.at("store")) {
       this.next();
       const t = this.peek();
-      if (!t || (t.kind !== "var" && t.kind !== "list" && t.kind !== "yref")) {
+      if (
+        !t ||
+        (t.kind !== "var" &&
+          t.kind !== "list" &&
+          t.kind !== "yref" &&
+          t.kind !== "matref")
+      ) {
         throw new ParseError("ERR: SYNTAX", this.here());
       }
       this.next();
@@ -126,6 +135,8 @@ class Parser {
       t.kind === "const" ||
       t.kind === "list" ||
       t.kind === "yref" ||
+      t.kind === "matref" ||
+      t.kind === "lbracket" ||
       t.kind === "lparen"
     );
   }
@@ -179,6 +190,32 @@ class Parser {
     }
   }
 
+  /** [[1,2][3,4]] — rows may also be comma-separated, as the device allows. */
+  private parseMatrixLiteral(): Node {
+    const open = this.peek()!;
+    this.next();
+    const rows: Node[][] = [];
+
+    while (this.at("lbracket")) {
+      this.next();
+      const row: Node[] = [];
+      if (!this.at("rbracket")) {
+        row.push(this.parseSum());
+        while (this.eat("comma")) row.push(this.parseSum());
+      }
+      if (!this.eat("rbracket") && this.i < this.toks.length) {
+        throw new ParseError("ERR: SYNTAX", this.here());
+      }
+      rows.push(row);
+      this.eat("comma");
+    }
+
+    if (rows.length === 0) throw new ParseError("ERR: INVALID DIM", open.start);
+    // the outer bracket may be left unclosed mid-typing
+    this.eat("rbracket");
+    return { t: "matlit", rows };
+  }
+
   private parsePrimary(): Node {
     const t = this.peek();
     if (!t) throw new ParseError("ERR: SYNTAX", this.src.length);
@@ -208,6 +245,11 @@ class Parser {
       this.next();
       return { t: "yref", name: t.value };
     }
+    if (t.kind === "matref") {
+      this.next();
+      return { t: "matref", name: t.value };
+    }
+    if (t.kind === "lbracket") return this.parseMatrixLiteral();
 
     if (t.kind === "fn") {
       this.next();

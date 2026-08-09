@@ -6,10 +6,11 @@ import { formatNumber } from "@/lib/math/format";
 import {
   MODE_ROWS,
   PLOT_COLORS,
-  WINDOW_FIELDS,
-  WINDOW_LABELS,
   useCalc,
+  visibleWindowFields,
+  windowLabel,
 } from "@/lib/calc/store";
+import { slotLabels } from "@/lib/calc/curves";
 
 const plain = { notation: "normal" as const, decimals: -1 };
 
@@ -19,10 +20,19 @@ export function YEditor() {
   const entry = useCalc((s) => s.entry);
   const insertMode = useCalc((s) => s.insertMode);
   const target = useCalc((s) => s.target);
+  const mode = useCalc((s) => s.modes.graphMode);
   const active = target.kind === "yeq" ? target.row : -1;
+  const labels = slotLabels(mode);
 
   return (
     <div className="pane">
+      {mode !== "func" && (
+        <p className="mode-caption">
+          {mode === "par"
+            ? "Parametric — slots pair up as X and Y in terms of T."
+            : "Polar — each slot is r in terms of θ."}
+        </p>
+      )}
       <div className="rows">
         {ys.map((y, i) => (
           <div className="row" key={y.id} data-active={i === active}>
@@ -37,10 +47,10 @@ export function YEditor() {
                 }))
               }
               aria-pressed={y.on}
-              aria-label={`${y.name} ${y.on ? "shown" : "hidden"}`}
+              aria-label={`${labels[i]} ${y.on ? "shown" : "hidden"}`}
             >
               <span className="swatch" />
-              {y.name}
+              {labels[i]}
             </button>
 
             <div className="row-value">
@@ -71,7 +81,7 @@ export function YEditor() {
                   revision: s.revision + 1,
                 }))
               }
-              aria-label={`${y.name} line style: ${y.style}`}
+              aria-label={`${labels[i]} line style: ${y.style}`}
             >
               {y.style}
             </button>
@@ -88,14 +98,16 @@ export function WindowEditor() {
   const entry = useCalc((s) => s.entry);
   const insertMode = useCalc((s) => s.insertMode);
   const target = useCalc((s) => s.target);
+  const mode = useCalc((s) => s.modes.graphMode);
   const active = target.kind === "window" ? target.row : -1;
+  const fields = visibleWindowFields(mode);
 
   return (
     <div className="pane">
       <div className="rows">
-        {WINDOW_FIELDS.map((f, i) => (
+        {fields.map((f, i) => (
           <div className="row" key={f} data-active={i === active}>
-            <span className="row-label">{WINDOW_LABELS[f]}</span>
+            <span className="row-label">{windowLabel(f, mode)}</span>
             <div className="row-value">
               {i === active ? (
                 <MathText text={entry.text} caret={entry.caret} overwrite={!insertMode} />
@@ -187,6 +199,7 @@ export function TableScreen() {
   useCalc((s) => s.revision);
 
   const shown = ys.filter((y) => y.expr.trim());
+  const labels = slotLabels(useCalc.getState().modes.graphMode);
   const fmt = { notation: modes.notation, decimals: modes.decimals };
   const rows = Array.from({ length: 24 }, (_, i) => tbl.start + (row + i) * tbl.step);
 
@@ -219,7 +232,7 @@ export function TableScreen() {
             <th>X</th>
             {shown.map((y) => (
               <th key={y.id} style={{ color: PLOT_COLORS[y.color % PLOT_COLORS.length] }}>
-                {y.name}
+                {labels[ys.indexOf(y)]}
               </th>
             ))}
           </tr>

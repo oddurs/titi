@@ -1,17 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { sampler } from "@/lib/math/eval";
 import { formatNumber, formatTick } from "@/lib/math/format";
 import { PLOT_COLORS, reportAspect, useCalc } from "@/lib/calc/store";
+import { buildCurves, paramRange, type Curve as ModeCurve } from "@/lib/calc/curves";
 import type { GraphWindow } from "@/lib/calc/types";
 
-interface Curve {
-  index: number;
-  color: string;
+interface Curve extends ModeCurve {
+  stroke: string;
   width: number;
   dotted: boolean;
-  f: (x: number) => number;
 }
 
 const AXIS = "rgba(233,238,245,0.42)";
@@ -63,28 +61,18 @@ export default function Plot() {
     [win.ymin, win.ymax, h],
   );
 
-  const curves: Curve[] = useMemo(() => {
-    const out: Curve[] = [];
-    for (let i = 0; i < ys.length; i++) {
-      const y = ys[i];
-      if (!y.on || !y.expr.trim()) continue;
-      try {
-        const local = { ...env, lenient: true, vars: { ...env.vars } };
-        out.push({
-          index: i,
-          color: PLOT_COLORS[y.color % PLOT_COLORS.length],
-          width: y.style === "thick" ? 3.4 : 2.1,
-          dotted: y.style === "dot" || !modes.connected,
-          f: sampler(y.expr, local),
-        });
-      } catch {
-        /* an unparseable Y is simply not drawn */
-      }
-    }
-    return out;
+  const curves: Curve[] = useMemo(
+    () =>
+      buildCurves(ys, modes, env).map((c) => ({
+        ...c,
+        stroke: PLOT_COLORS[c.color % PLOT_COLORS.length],
+        width: c.style === "thick" ? 3.4 : 2.1,
+        dotted: c.style === "dot" || !modes.connected,
+      })),
     // env is mutated in place by the store; revision is the redraw signal
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ys, modes.connected, revision, env]);
+    [ys, modes, revision, env],
+  );
 
   // -- resize ---------------------------------------------------------------
 
@@ -120,14 +108,14 @@ export default function Plot() {
 
     drawGrid(ctx, win, w, h, modes.grid);
     drawStatPlots(ctx, plots, lists, toPx, toPy);
-    for (const c of curves) drawCurve(ctx, c, win, w, h, toPx, toPy);
+    for (const c of curves) drawCurve(ctx, c, win, w, h, toPx, toPy, modes.graphMode);
     if (modes.labelAxes) drawAxisLabels(ctx, win, w, h, monoFamily);
     drawMarks(ctx, marks, curves, toPx, toPy, w, h);
     drawTrace(ctx, trace, curves, toPx, toPy, w, h, graphPrompt);
     if (box) drawZoomBox(ctx, box);
   }, [
-    w, h, win, curves, modes.grid, modes.labelAxes, marks, trace, plots, lists,
-    box, graphPrompt, revision, toPx, toPy,
+    w, h, win, curves, modes.grid, modes.labelAxes, modes.graphMode, marks,
+    trace, plots, lists, box, graphPrompt, revision, toPx, toPy,
   ]);
 
   // -- pointer --------------------------------------------------------------
@@ -272,24 +260,32 @@ export default function Plot() {
     if (trace) {
       const c = curves.find((cv) => cv.index === trace.fn);
       if (!c) return null;
-      const y = c.f(trace.x);
+      const p = c.at(trace.x);
+      const finite = Number.isFinite(p.x) && Number.isFinite(p.y);
       return {
-        color: c.color,
-        name: ys[trace.fn]?.name ?? "",
-        x: trim(formatNumber(trace.x, fmt)),
-        y: Number.isFinite(y) ? trim(formatNumber(y, fmt)) : "—",
+        color: c.stroke,
+        name: c.label,
+        param: c.isFunction
+          ? null
+          : {
+              label: modes.graphMode === "pol" ? "θ" : "t",
+              value: trim(formatNumber(trace.x, fmt)),
+            },
+        x: finite ? trim(formatNumber(p.x, fmt)) : "—",
+        y: finite ? trim(formatNumber(p.y, fmt)) : "—",
       };
     }
     if (cursor && modes.coordsOn) {
       return {
         color: "var(--muted)",
         name: "",
+        param: null,
         x: trim(formatNumber(cursor.x, fmt)),
         y: trim(formatNumber(cursor.y, fmt)),
       };
     }
     return null;
-  }, [trace, cursor, curves, ys, modes]);
+  }, [trace, cursor, curves, modes]);
 
   const markChip = marks[0];
   const fmt = { notation: modes.notation, decimals: modes.decimals };
@@ -310,6 +306,11 @@ export default function Plot() {
       {readout && (
         <div className="readout-bar">
           {readout.name && <b style={{ color: readout.color }}>{readout.name}</b>}
+          {readout.param && (
+            <span>
+              <b>{readout.param.label}</b> {readout.param.value}
+            </span>
+          )}
           <span>
             <b>x</b> {readout.x}
           </span>
@@ -498,6 +499,45 @@ function drawAxisLabels(
   ctx.restore();
 }
 
+/**
+ * Sample a curve into screen points. Function mode walks pixel columns;
+ * parametric and polar walk the parameter at Tstep.
+ */
+function samplePoints(
+  c: Curve,
+  win: GraphWindow,
+  w: number,
+  mode: "func" | "par" | "pol",
+  toPx: (x: number) => number,
+  toPy: (y: number) => number,
+): { px: number; py: number; ok: boolean }[] {
+  const pts: { px: number; py: number; ok: boolean }[] = [];
+  const clampPx = (v: number) => Math.max(-1e5, Math.min(1e5, v));
+
+  if (c.isFunction) {
+    const step = Math.max(0.4, 0.5 * win.xres);
+    const spanX = win.xmax - win.xmin;
+    for (let px = 0; px <= w + step; px += step) {
+      const { y } = c.at(win.xmin + (px / w) * spanX);
+      pts.push({ px, py: clampPx(toPy(y)), ok: Number.isFinite(y) });
+    }
+    return pts;
+  }
+
+  const { min, max, step } = paramRange(mode, win);
+  const n = Math.min(6000, Math.max(2, Math.ceil((max - min) / Math.max(1e-9, step))));
+  for (let i = 0; i <= n; i++) {
+    const t = min + ((max - min) * i) / n;
+    const { x, y } = c.at(t);
+    pts.push({
+      px: clampPx(toPx(x)),
+      py: clampPx(toPy(y)),
+      ok: Number.isFinite(x) && Number.isFinite(y),
+    });
+  }
+  return pts;
+}
+
 function drawCurve(
   ctx: CanvasRenderingContext2D,
   c: Curve,
@@ -506,64 +546,58 @@ function drawCurve(
   h: number,
   toPx: (x: number) => number,
   toPy: (y: number) => number,
+  mode: "func" | "par" | "pol",
 ) {
-  const step = Math.max(0.4, 0.5 * win.xres);
-  const spanX = win.xmax - win.xmin;
+  const pts = samplePoints(c, win, w, mode, toPx, toPy);
 
   if (c.dotted) {
-    ctx.fillStyle = c.color;
-    for (let px = 0; px <= w; px += Math.max(2.5, step * 4)) {
-      const y = c.f(win.xmin + (px / w) * spanX);
-      if (!Number.isFinite(y)) continue;
-      const py = toPy(y);
-      if (py < -20 || py > h + 20) continue;
+    ctx.fillStyle = c.stroke;
+    const every = Math.max(1, Math.round(pts.length / 260));
+    pts.forEach((p, i) => {
+      if (i % every || !p.ok) return;
+      if (p.py < -20 || p.py > h + 20) return;
       ctx.beginPath();
-      ctx.arc(px, py, c.width * 0.62, 0, Math.PI * 2);
+      ctx.arc(p.px, p.py, c.width * 0.62, 0, Math.PI * 2);
       ctx.fill();
-    }
+    });
     return;
   }
 
   const path = new Path2D();
   let drawing = false;
-  let prevY = NaN;
-  let prevPy = NaN;
+  let prev: { px: number; py: number } | null = null;
 
-  for (let px = 0; px <= w + step; px += step) {
-    const x = win.xmin + (px / w) * spanX;
-    const y = c.f(x);
-
-    if (!Number.isFinite(y)) {
+  for (const p of pts) {
+    if (!p.ok) {
       drawing = false;
-      prevY = NaN;
+      prev = null;
       continue;
     }
-
-    const py = Math.max(-1e5, Math.min(1e5, toPy(y)));
-
-    // Break at a pole: a huge jump that flips sign is an asymptote, not a line.
-    if (drawing && Number.isFinite(prevY)) {
-      const jump = Math.abs(py - prevPy);
-      if (jump > h * 1.5 && prevY * y < 0) drawing = false;
+    // Break at a pole: a jump far larger than the canvas is an asymptote, not
+    // a line. Parametric curves legitimately move fast, so the threshold is
+    // generous and only applies vertically for functions.
+    if (drawing && prev) {
+      const jump = c.isFunction
+        ? Math.abs(p.py - prev.py)
+        : Math.hypot(p.px - prev.px, p.py - prev.py);
+      if (jump > h * (c.isFunction ? 1.5 : 4)) drawing = false;
     }
-
     if (!drawing) {
-      path.moveTo(px, py);
+      path.moveTo(p.px, p.py);
       drawing = true;
     } else {
-      path.lineTo(px, py);
+      path.lineTo(p.px, p.py);
     }
-    prevY = y;
-    prevPy = py;
+    prev = p;
   }
 
   ctx.save();
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  ctx.strokeStyle = c.color;
+  ctx.strokeStyle = c.stroke;
 
   // a soft bloom, then the crisp core — the curve reads as emitted light
-  ctx.shadowColor = c.color;
+  ctx.shadowColor = c.stroke;
   ctx.shadowBlur = 14;
   ctx.globalAlpha = 0.55;
   ctx.lineWidth = c.width;
@@ -636,7 +670,7 @@ function drawMarks(
 ) {
   for (const m of marks) {
     const c = curves.find((cv) => cv.index === m.fn);
-    const color = c?.color ?? "#FFB454";
+    const color = c?.stroke ?? "#FFB454";
 
     if (m.kind === "area" && c && m.x2 !== undefined) {
       const a = Math.min(m.x, m.x2);
@@ -653,7 +687,7 @@ function drawMarks(
       ctx.beginPath();
       ctx.moveTo(pa, zero);
       for (let px = pa; px <= pb; px += 1) {
-        const y = c.f(a + ((px - pa) / Math.max(1, pb - pa)) * (b - a));
+        const { y } = c.at(a + ((px - pa) / Math.max(1, pb - pa)) * (b - a));
         ctx.lineTo(px, Number.isFinite(y) ? toPy(y) : zero);
       }
       ctx.lineTo(pb, zero);
@@ -729,14 +763,15 @@ function drawTrace(
   if (!trace) return;
   const c = curves.find((cv) => cv.index === trace.fn);
   if (!c) return;
-  const y = c.f(trace.x);
-  const px = toPx(trace.x);
-  const py = toPy(y);
+  const point = c.at(trace.x);
+  const px = toPx(point.x);
+  const py = toPy(point.y);
+  const finite = Number.isFinite(point.x) && Number.isFinite(point.y);
 
   if (prompt?.op === "integral" && prompt.lower !== undefined) {
     const pl = toPx(prompt.lower);
     ctx.save();
-    ctx.fillStyle = `${c.color}18`;
+    ctx.fillStyle = `${c.stroke}18`;
     ctx.fillRect(Math.min(pl, px), 0, Math.abs(px - pl), h);
     ctx.restore();
   }
@@ -746,21 +781,21 @@ function drawTrace(
   ctx.lineWidth = 1;
   ctx.setLineDash([2, 5]);
   ctx.beginPath();
-  ctx.moveTo(px + 0.5, 0);
-  ctx.lineTo(px + 0.5, h);
-  if (Number.isFinite(y)) {
+  if (finite) {
+    ctx.moveTo(px + 0.5, 0);
+    ctx.lineTo(px + 0.5, h);
     ctx.moveTo(0, py + 0.5);
     ctx.lineTo(w, py + 0.5);
   }
   ctx.stroke();
   ctx.restore();
 
-  if (!Number.isFinite(y)) return;
+  if (!finite) return;
 
   ctx.save();
-  ctx.shadowColor = c.color;
+  ctx.shadowColor = c.stroke;
   ctx.shadowBlur = 16;
-  ctx.fillStyle = c.color;
+  ctx.fillStyle = c.stroke;
   ctx.beginPath();
   ctx.arc(px, py, 5, 0, Math.PI * 2);
   ctx.fill();

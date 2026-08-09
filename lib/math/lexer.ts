@@ -15,6 +15,9 @@ export type TokKind =
   | "const"
   | "list"
   | "yref"
+  | "matref"
+  | "lbracket"
+  | "rbracket"
   | "unknown";
 
 export interface Token {
@@ -72,6 +75,16 @@ export const FUNCTIONS = [
   "e^(",
   "solve(",
   "conj(",
+  "det(",
+  "identity(",
+  "rref(",
+  "ref(",
+  "augment(",
+  "dim(",
+  "Fill(",
+  "randM(",
+  "Matr▸list(",
+  "List▸matr(",
 ] as const;
 
 const FN_CANON: Record<string, string> = {
@@ -87,11 +100,14 @@ const FN_CANON: Record<string, string> = {
   "10^(": "pow10",
   "e^(": "expe",
   "stdDev(": "stdDev",
+  "Matr▸list(": "matr2list",
+  "List▸matr(": "list2matr",
 };
 
 /** Two-character postfix / operator glyphs and misc singles. */
 const OPERATORS = [
   "⁻¹",
+  "ᵀ",
   "≤",
   "≥",
   "≠",
@@ -112,7 +128,7 @@ const OPERATORS = [
   ">",
 ] as const;
 
-const POSTFIX = new Set(["⁻¹", "²", "³", "!"]);
+const POSTFIX = new Set(["⁻¹", "²", "³", "!", "ᵀ"]);
 
 const CONSTS: Record<string, string> = {
   "π": "pi",
@@ -187,8 +203,11 @@ export function lex(src: string): Token[] {
       continue;
     }
 
-    // List and function references: L₁..L₆, Y₁..Y₆
-    if ((c === "L" || c === "Y") && "₀₁₂₃₄₅₆₇₈₉".includes(src[i + 1] ?? "")) {
+    // List and function references: L₁..L₆, Y₁..Y₆.
+    // The subscript must actually be there — "".includes() is true for every
+    // string, so a bare trailing L or Y used to lex as a reference.
+    const sub = src[i + 1];
+    if ((c === "L" || c === "Y") && sub !== undefined && "₀₁₂₃₄₅₆₇₈₉".includes(sub)) {
       const text = src.slice(i, i + 2);
       push(c === "L" ? "list" : "yref", text, text, i);
       i += 2;
@@ -203,6 +222,25 @@ export function lex(src: string): Token[] {
 
     if (VAR_CHARS.includes(c)) {
       push("var", c, c, i);
+      i += 1;
+      continue;
+    }
+
+    // [A]..[J] is a matrix name; a bare [ opens a literal like [[1,2][3,4]]
+    if (c === "[") {
+      const name = src[i + 1];
+      if (name >= "A" && name <= "J" && src[i + 2] === "]") {
+        const text = src.slice(i, i + 3);
+        push("matref", text, text, i);
+        i += 3;
+        continue;
+      }
+      push("lbracket", c, "[", i);
+      i += 1;
+      continue;
+    }
+    if (c === "]") {
+      push("rbracket", c, "]", i);
       i += 1;
       continue;
     }

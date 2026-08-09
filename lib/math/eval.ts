@@ -598,7 +598,10 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
   const { name, args } = node;
 
   // ---- special forms: these need the unevaluated body ----------------------
-  if (name === "nDeriv" || name === "fnInt" || name === "seq" || name === "sum" || name === "solve") {
+  if (
+    name === "nDeriv" || name === "fnInt" || name === "seq" ||
+    name === "sum" || name === "prod" || name === "solve"
+  ) {
     return compileSpecial(node);
   }
 
@@ -818,6 +821,32 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
     case "gcd":
       return (env) => map2(a[0](env), a[1](env), gcd2);
 
+    // SortA( and SortD( write back through a named list, the way the device
+    // does — the sorted list is returned as well, so they compose.
+    case "sortA":
+    case "sortD": {
+      const target = args[0].t === "list" ? args[0].name : null;
+      const dir = name === "sortA" ? 1 : -1;
+      return (env) => {
+        const sorted = [...asList(a[0](env))].sort((p, q) => (p - q) * dir);
+        if (target) env.lists[target] = sorted.slice();
+        return sorted;
+      };
+    }
+
+    case "cumSum":
+      return (env) => {
+        let run = 0;
+        return asList(a[0](env)).map((x) => (run += x));
+      };
+
+    case "deltaList":
+      return (env) => {
+        const l = asList(a[0](env));
+        if (l.length < 2) throw new CalcError("ERR: DIM MISMATCH");
+        return l.slice(1).map((x, i) => x - l[i]);
+      };
+
     case "mean": return (env) => stat(a[0](env), (l) => l.reduce((s, x) => s + x, 0) / l.length);
     case "median":
       return (env) =>
@@ -924,12 +953,20 @@ function compileMatrixCall(node: Extract<Node, { t: "call" }>): Fn {
         );
 
     case "Fill": {
-      // Fill(value, [A]) writes through to the named matrix, as on the device.
-      const target = args[1].t === "matref" ? args[1].name : null;
+      // Fill(value, [A]) writes through to the named matrix, as on the device,
+      // and Fill(value, L₁) does the same for a list.
+      const matTarget = args[1].t === "matref" ? args[1].name : null;
+      const listTarget = args[1].t === "list" ? args[1].name : null;
       return (env) => {
         const value = num(a[0](env));
-        const filled = lift(() => M.mapMatrix(asMatrix(a[1](env)), () => value));
-        if (target) env.mats[target] = filled;
+        const into = a[1](env);
+        if (Array.isArray(into)) {
+          const filled = into.map(() => value);
+          if (listTarget) env.lists[listTarget] = filled.slice();
+          return filled;
+        }
+        const filled = lift(() => M.mapMatrix(asMatrix(into), () => value));
+        if (matTarget) env.mats[matTarget] = filled;
         return filled;
       };
     }
@@ -1011,15 +1048,19 @@ function compileSpecial(node: Extract<Node, { t: "call" }>): Fn {
     };
   }
 
-  // sum(list) or sum(list, start, end)
+  // sum(list) and prod(list), each optionally over a 1-based slice
   const listF = compile(args[0]);
   const s = args[1] ? compile(args[1]) : null;
   const e = args[2] ? compile(args[2]) : null;
+  const combine = name === "prod"
+    ? (acc: number, x: number) => acc * x
+    : (acc: number, x: number) => acc + x;
+  const seed = name === "prod" ? 1 : 0;
   return (env) => {
     const l = asList(listF(env));
     const from = s ? num(s(env)) - 1 : 0;
     const to = e ? num(e(env)) : l.length;
-    return l.slice(from, to).reduce((acc: number, x: number) => acc + x, 0);
+    return l.slice(from, to).reduce(combine, seed);
   };
 }
 

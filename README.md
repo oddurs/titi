@@ -84,8 +84,20 @@ interpolated quantile. Normal and binomial distributions under `DISTR`.
 points — arrows move a free cursor, `ENTER` sets one — and `ClrDraw` takes it
 all back off.
 
+**Lists.** `LIST` splits into NAMES, OPS and MATH the way the device does.
+`SortA(` and `SortD(` write back through the list they were given, and `dim(`,
+`Fill(`, `seq(`, `cumSum(`, `ΔList(`, `augment(` and the `List▸matr(` pair do
+the rest. `sum(` and `prod(` take an optional slice.
+
+**Catalog.** `2nd CATALOG` lists everything the engine knows — built from the
+lexer's own tables, so a function added to the engine appears there without
+anyone remembering to add it. It opens with A-lock on, and a letter jumps to
+that letter; pressing it again walks the run.
+
 **Tables and modes.** `TABLE` with `TBLSET`, and `MODE` for Normal/Sci/Eng,
-Float/Fix, Radian/Degree, Connected/Dot, grid, labels and coordinates.
+Float/Fix, Radian/Degree, Connected/Dot, grid, labels and coordinates. `2nd ▲`
+and `2nd ▼` set the contrast, which is remembered — alpha on the panel is one
+bit, so contrast scales the ink rather than fading it.
 
 `2nd ENTRY` walks back through what you have typed, one entry per press, and
 wraps at the end.
@@ -101,6 +113,10 @@ made in.
 Digits and operators type straight through. Letters insert variables. `Enter`
 evaluates, `Backspace` deletes a whole token, `Esc` closes a menu, and the arrow
 keys drive the cursor, the trace and the menus.
+
+The keypad is a single tab stop rather than fifty. Tab into it and the arrows
+move between keys, `Enter` or `Space` presses one, and `Home` and `End` jump to
+the ends; tab away and the arrows go back to driving the calculator.
 
 ## Layout
 

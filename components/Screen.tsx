@@ -63,6 +63,7 @@ export default function Screen() {
 
     if (!panelRef.current) panelRef.current = new DotPanel();
     const panel = panelRef.current;
+    panel.contrast = state.modes.contrast;
     const m = panel.resize(size.w, size.h, dpr);
 
     canvas.width = m.cols * m.dot;

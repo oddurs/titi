@@ -1,6 +1,7 @@
 import { describe, eq, near, ok, reportIfMain } from "./harness";
 import { device } from "./device";
 import { evaluate, makeEnv } from "../lib/math/eval";
+import { ALL_KEYS, ARROW_KEYS, NAV, stepFocus } from "../lib/calc/keys";
 
 /**
  * What a keypress does.
@@ -411,6 +412,55 @@ describe("the new regressions from the keypad");
   ok("and writes a sine into Y₁", /sin\(/.test(expr), expr);
   near("with the amplitude it was given", Number(expr.slice(0, expr.indexOf("sin("))), 2, 1e-4);
   ok("which the engine can read back", evaluates(expr));
+}
+
+describe("the catalog");
+{
+  const d = device().press("2nd catalog");
+  const items = () => d.get().menu!.tabs[0].items;
+  ok("lists far more than a hand-written menu could", items().length > 60);
+  ok("built from what the engine knows", items().some((i) => i.label === "ΔList("));
+  eq("and opens with A-lock on, as the device does", d.get().mod, "alpha-lock");
+  ok("symbols sort ahead of the letters", !/^[A-Za-z]/.test(items()[0].label));
+}
+{
+  const d = device().press("2nd catalog").press("S");
+  const at = () => d.get().menu!.tabs[0].items[d.get().menu!.index].label;
+  eq("a letter jumps to it", at(), "seq(");
+  d.press("S");
+  eq("pressing it again walks the run", at(), "sin(");
+  d.press("C");
+  eq("and another letter starts its own", at(), "conj(");
+}
+{
+  const d = device().press("2nd catalog").press("C").press("enter");
+  eq("enter inserts the item, not its own alpha label", d.get().entry.text, "conj(");
+  eq("and A-lock is released", d.get().mod, "none");
+}
+{
+  const d = device().press("2nd catalog").press("2nd quit").press("alpha A");
+  eq("outside a menu, alpha still types", d.get().entry.text, "A");
+}
+
+describe("moving focus around the keypad");
+{
+  eq("right steps along a row", stepFocus("yeq", 0, 1), "window");
+  eq("left steps back", stepFocus("window", 0, -1), "yeq");
+  eq("the left edge holds", stepFocus("yeq", 0, -1), "yeq");
+  eq("down goes to the row below", stepFocus("yeq", 1, 0), "2nd");
+  eq("up comes back", stepFocus("2nd", -1, 0), "yeq");
+  eq("the top edge holds", stepFocus("yeq", -1, 0), "yeq");
+  ok("every key is reachable", NAV.length === ALL_KEYS.length + ARROW_KEYS.length);
+  ok("and each appears once", new Set(NAV.map((n) => n.id)).size === NAV.length);
+}
+{
+  // The rows are ragged, so down from a key with nothing directly beneath it
+  // has to land on the nearest column rather than nothing at all.
+  for (const n of NAV) {
+    const down = stepFocus(n.id, 1, 0);
+    ok(`${n.id} can move down`, typeof down === "string" && down.length > 0);
+  }
+  eq("the arrow cluster is the last row", stepFocus("d0", 1, 0).length > 0, true);
 }
 
 reportIfMain(import.meta.url);

@@ -693,7 +693,29 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
 
     const def = MENUS[name];
     if (!def) return;
-    set({ menu: { title: def.title, tabs: def.tabs, tab: 0, index: 0 } });
+    set({
+      menu: { title: def.title, tabs: def.tabs, tab: 0, index: 0 },
+      // The catalog opens with A-lock on, as the device does, so a letter can
+      // be pressed straight away.
+      mod: name === "catalog" ? "alpha-lock" : get().mod,
+    });
+  }
+
+  /** Move the selection to the first item beginning with this letter. */
+  function jumpMenuTo(letter: string): boolean {
+    const m = get().menu;
+    if (!m) return false;
+    const items = m.tabs[m.tab].items;
+    const lower = letter.toLowerCase();
+    // Start after the current row so repeated presses walk the letter's run.
+    for (let k = 1; k <= items.length; k++) {
+      const i = (m.index + k) % items.length;
+      if (items[i].label.toLowerCase().startsWith(lower)) {
+        set({ menu: { ...m, index: i } });
+        return true;
+      }
+    }
+    return false;
   }
 
   function chooseMenuItem() {
@@ -733,6 +755,14 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       case "menu":
         openMenu(arg);
         return;
+      case "contrast": {
+        const contrast = clamp(st.modes.contrast + (arg === "up" ? 1 : -1), 0, 9);
+        if (contrast === st.modes.contrast) return note(`Contrast ${contrast}`);
+        set({ modes: { ...st.modes, contrast }, revision: st.revision + 1 });
+        note(`Contrast ${contrast}`);
+        persist();
+        return;
+      }
       case "zoom":
         applyZoom(arg);
         return;
@@ -1163,12 +1193,16 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       const key = keyById(id);
       if (!key) return;
       const st = get();
-      const mod = st.mod;
 
       const isModKey = key.role === "mod2nd" || key.role === "modalpha";
+      // ENTER ends A-lock and acts as ENTER — it does not type its own alpha
+      // label. Reading st.mod after the reset would have missed that.
+      const releasesLock = !isModKey && st.mod === "alpha-lock" && key.role === "enter";
+      const mod = releasesLock ? "none" : st.mod;
+
       // The modifier is consumed by the next keypress, exactly like the device.
-      if (!isModKey && mod !== "alpha-lock") set({ mod: "none" });
-      if (!isModKey && mod === "alpha-lock" && key.role === "enter") set({ mod: "none" });
+      if (!isModKey && st.mod !== "alpha-lock") set({ mod: "none" });
+      if (releasesLock) set({ mod: "none" });
 
       if (mod === "2nd") {
         if (key.act2) return runAction(key.act2);
@@ -1180,6 +1214,9 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
 
       if ((mod === "alpha" || mod === "alpha-lock") && !isModKey) {
         const text = key.insA ?? key.alpha;
+        // A letter in an open menu jumps to that letter rather than typing —
+        // which is the only way a 72-item catalog is usable.
+        if (st.menu && text && /^[A-Za-z]$/.test(text) && jumpMenuTo(text)) return;
         if (text && text !== "␣") return insert(text);
         if (text === "␣") return insert(" ");
         // keys with no alpha label fall through to their normal behaviour

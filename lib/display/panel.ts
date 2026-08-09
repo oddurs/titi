@@ -62,12 +62,27 @@ export const LCD_THEME: PanelTheme = {
   onDot: "#cfe6ff",
 };
 
+/**
+ * How much to scale the ink for a given contrast setting.
+ *
+ * 5 leaves the panel exactly as drawn, so the design's own colours are the
+ * reference; either side of that is a straight ramp, chosen so 0 is still
+ * legible rather than black-on-black.
+ */
+export function inkGain(contrast: number): number {
+  const c = Math.min(9, Math.max(0, Math.round(contrast)));
+  return 0.45 + c * 0.12;
+}
+
 export class DotPanel {
   readonly buffer: HTMLCanvasElement;
   readonly ctx: CanvasRenderingContext2D;
   metrics: PanelMetrics = {
     cols: 1, rows: 1, dot: 3, cssWidth: 1, cssHeight: 1,
   };
+
+  /** 0–9; the device's contrast setting, applied when the buffer is thresholded */
+  contrast = 5;
 
   /** tiles built once per geometry change */
   private offTile: CanvasPattern | null = null;
@@ -112,13 +127,28 @@ export class DotPanel {
    * should light both rather than neither, which is what a real glyph ROM
    * would have done when the face was fitted to the grid.
    */
+  /**
+   * One bit of coverage, and contrast in the colour.
+   *
+   * Alpha is thresholded, so a dimmer dot cannot be a more transparent one —
+   * the only lever left is the ink itself, which is scaled here. This is also
+   * the one pass that already touches every pixel.
+   */
   private threshold(cutoff = 64) {
     const { cols, rows } = this.metrics;
     if (cols < 1 || rows < 1) return;
     const img = this.ctx.getImageData(0, 0, cols, rows);
     const d = img.data;
+    const gain = inkGain(this.contrast);
+    const scale = gain === 1 ? null : gain;
     for (let i = 3; i < d.length; i += 4) {
-      d[i] = d[i] >= cutoff ? 255 : 0;
+      const lit = d[i] >= cutoff;
+      d[i] = lit ? 255 : 0;
+      if (lit && scale !== null) {
+        d[i - 3] = Math.min(255, d[i - 3] * scale);
+        d[i - 2] = Math.min(255, d[i - 2] * scale);
+        d[i - 1] = Math.min(255, d[i - 1] * scale);
+      }
     }
     this.ctx.putImageData(img, 0, 0);
   }

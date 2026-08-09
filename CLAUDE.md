@@ -130,6 +130,17 @@ are left out of `persistence.ts` on purpose — a drawing is placed in graph
 units against a particular window, so restoring one into a different window
 puts it somewhere it was never put.
 
+**The keypad owns its own arrows, but only while focused.** `NAV` and
+`stepFocus` in `keys.ts` are the focus model; `Keypad.tsx` uses them for a
+roving tabindex, so fifty buttons are one tab stop. The global key handler bows
+out of Arrow, Enter and Space whenever focus is inside the keypad — otherwise
+the two fight over the same keys and neither wins.
+
+**The catalog is generated, not written.** `catalogItems()` in `menus.ts` builds
+it from the lexer's `FUNCTIONS`, so adding a function to the engine puts it in
+the catalog. A letter key in any open menu jumps the selection rather than
+typing; the catalog just happens to be the menu that needs it.
+
 **A menu closes before its action runs.** `chooseMenuItem` clears `menu` and
 then dispatches, so an action that means to stay open (stepping a stat plot's
 list, say) reads `menuBeforeAction` — the menu it was chosen from, live only
@@ -171,6 +182,7 @@ Do not "fix" these — they are tested:
   quantile, which would put Q₁ of 1,2,3,4,5 at 2 rather than 1.5
 - `▸DMS` is a display format on a number of degrees, not a conversion; reaching
   it from radians means writing the `ʳ` mark
+- ENTER ends A-lock and acts as ENTER — it never types its own `solve` label
 
 ## The display
 
@@ -180,7 +192,8 @@ thresholded, then blown up. Three consequences worth knowing before touching it:
 - **Alpha is binary, so colour is the only brightness control.** A translucent
   ink does not come out dimmer — it comes out lit or absent. Use a darker RGB
   instead. This is why the graph has three distinct greys rather than three
-  opacities of one.
+  opacities of one, and why contrast (`inkGain` in `panel.ts`) scales the RGB
+  of lit dots in the same pass that thresholds them.
 - **Draw on integers.** `Pen` plots lines with Bresenham rather than stroking,
   so nothing relies on the threshold to look straight.
 - **Text comes from a character ROM, not a font.** `lib/display/glyphs.ts` holds

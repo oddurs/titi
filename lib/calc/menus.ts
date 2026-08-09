@@ -1,7 +1,39 @@
-import type { MenuTab } from "./types";
+import { FUNCTIONS } from "../math/lexer";
+import type { MenuItem, MenuTab } from "./types";
 
 const ins = (label: string, insert: string, hint?: string) => ({ label, insert, hint });
 const act = (label: string, action: string, hint?: string) => ({ label, action, hint });
+
+/**
+ * Everything the engine can be asked for, in one alphabetical list.
+ *
+ * Built from the lexer's own tables rather than typed out again, so a function
+ * added to the engine appears here without anyone remembering to add it. The
+ * device sorts symbols before letters and ignores case, and so does this.
+ */
+function catalogItems(): MenuItem[] {
+  const hints: Record<string, string> = {
+    "ΔList(": "differences between neighbours",
+    "cumSum(": "running totals",
+    "fnInt(": "definite integral",
+    "nDeriv(": "numeric derivative",
+    "solve(": "root near a guess",
+    "randInt(": "lower, upper, n",
+    "seq(": "expr, var, from, to, step",
+    "rref(": "reduced row echelon",
+  };
+  const extras = ["π", "ℯ", "Ans", "rand", "θ", "∞"];
+  const key = (label: string) => {
+    const first = label[0];
+    const isLetter = /[A-Za-z]/.test(first);
+    // Symbols sort ahead of every letter, as on the device.
+    return `${isLetter ? "1" : "0"}${label.toLowerCase()}`;
+  };
+  return [...FUNCTIONS, ...extras]
+    .filter((label, i, all) => all.indexOf(label) === i)
+    .sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0))
+    .map((label) => ({ label, insert: label, hint: hints[label] }));
+}
 
 export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
   math: {
@@ -193,23 +225,42 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
 
   list: {
     title: "list",
+    // NAMES, OPS and MATH, the way the device splits them: what a list is
+    // called, what rearranges one, and what reduces one to a number.
     tabs: [
-      {
-        name: "ops",
-        items: [
-          ins("seq(", "seq(", "expr, var, from, to, step"),
-          ins("sum(", "sum("),
-          ins("mean(", "mean("),
-          ins("median(", "median("),
-          ins("stdDev(", "stdDev("),
-          ins("variance(", "variance("),
-        ],
-      },
       {
         name: "names",
         items: [
           ins("L₁", "L₁"), ins("L₂", "L₂"), ins("L₃", "L₃"),
           ins("L₄", "L₄"), ins("L₅", "L₅"), ins("L₆", "L₆"),
+        ],
+      },
+      {
+        name: "ops",
+        items: [
+          ins("SortA(", "SortA(", "sort a list in place, ascending"),
+          ins("SortD(", "SortD(", "the same, descending"),
+          ins("dim(", "dim(", "how many entries"),
+          ins("Fill(", "Fill(", "value, list"),
+          ins("seq(", "seq(", "expr, var, from, to, step"),
+          ins("cumSum(", "cumSum(", "running totals"),
+          ins("ΔList(", "ΔList(", "differences between neighbours"),
+          ins("augment(", "augment(", "one list after another"),
+          ins("List▸matr(", "List▸matr(", "lists to columns"),
+          ins("Matr▸list(", "Matr▸list(", "matrix, column"),
+        ],
+      },
+      {
+        name: "math",
+        items: [
+          ins("min(", "min("),
+          ins("max(", "max("),
+          ins("mean(", "mean("),
+          ins("median(", "median("),
+          ins("sum(", "sum(", "optionally over a slice"),
+          ins("prod(", "prod("),
+          ins("stdDev(", "stdDev("),
+          ins("variance(", "variance("),
         ],
       },
     ],
@@ -318,25 +369,6 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
 
   catalog: {
     title: "catalog",
-    tabs: [
-      {
-        name: "a–z",
-        items: [
-          ins("abs(", "abs("), ins("binomcdf(", "binomcdf("),
-          ins("binompdf(", "binompdf("), ins("cos(", "cos("),
-          ins("fnInt(", "fnInt("), ins("gcd(", "gcd("),
-          ins("invNorm(", "invNorm("), ins("lcm(", "lcm("),
-          ins("ln(", "ln("), ins("log(", "log("),
-          ins("max(", "max("), ins("mean(", "mean("),
-          ins("median(", "median("), ins("min(", "min("),
-          ins("nDeriv(", "nDeriv("), ins("normalcdf(", "normalcdf("),
-          ins("normalpdf(", "normalpdf("), ins("randInt(", "randInt("),
-          ins("round(", "round("), ins("seq(", "seq("),
-          ins("sin(", "sin("), ins("solve(", "solve("),
-          ins("stdDev(", "stdDev("), ins("sum(", "sum("),
-          ins("tan(", "tan("), ins("variance(", "variance("),
-        ],
-      },
-    ],
+    tabs: [{ name: "a–z", items: catalogItems() }],
   },
 };

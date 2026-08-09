@@ -26,6 +26,7 @@ const ARITY: Record<string, [number, number]> = {
   matr2list: [2, 2], list2matr: [1, 9],
   real: [1, 1], imag: [1, 1], angle: [1, 1], "@seq": [2, 2],
   rectToR: [2, 2], rectToTheta: [2, 2], polarToX: [2, 2], polarToY: [2, 2],
+  sortA: [1, 1], sortD: [1, 1], cumSum: [1, 1], deltaList: [1, 1], prod: [1, 3],
   normalpdf: [1, 3], normalcdf: [2, 4], invNorm: [1, 3],
   binompdf: [2, 3], binomcdf: [2, 3], solve: [2, 4],
 };

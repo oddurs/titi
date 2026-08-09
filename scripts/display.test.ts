@@ -1,7 +1,8 @@
-import { describe, eq, ok, reportIfMain } from "./harness";
+import { describe, eq, near, ok, reportIfMain } from "./harness";
 import { device } from "./device";
 import { renderPanel, shows } from "./panel";
 import { CHAR_H, Pen } from "../lib/display/pen";
+import { inkGain } from "../lib/display/panel";
 import { renderFailure } from "../lib/display/screens";
 
 /**
@@ -287,6 +288,27 @@ describe("stat plots");
   ok("with a summary of the plot", (d.get().message ?? "").includes("L₂"));
   const m = d.press("down").press("down").press("enter");
   eq("stepping the mark cycles it on from the default", m.get().plots[0].mark, "dot");
+}
+
+describe("contrast");
+{
+  near("5 leaves the panel exactly as drawn", inkGain(5), 1.05);
+  ok("lower settings dim it", inkGain(0) < inkGain(5));
+  ok("higher settings push it", inkGain(9) > inkGain(5));
+  ok("and 0 is still legible", inkGain(0) > 0.4);
+  eq("out of range clamps rather than going dark", inkGain(-3), inkGain(0));
+  eq("and at the top", inkGain(99), inkGain(9));
+}
+{
+  const d = device().press("2nd lighter");
+  eq("2nd ▲ raises it", d.get().modes.contrast, 6);
+  ok("and says where it got to", (d.get().message ?? "").includes("6"));
+  d.repeat("2nd lighter", 9);
+  eq("it stops at 9", d.get().modes.contrast, 9);
+  d.repeat("2nd darker", 20);
+  eq("and at 0", d.get().modes.contrast, 0);
+  const plain = device().press("up");
+  eq("unmodified, the arrow still does its own job", plain.get().modes.contrast, 5);
 }
 
 describe("a failing screen still says something");

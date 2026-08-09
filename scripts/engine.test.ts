@@ -141,4 +141,31 @@ check("P▸Rx(2,60)", "1");
 check("P▸Ry(2,90)", "2", toDeg);
 check("R▸Pθ(1,1)", ".7853981634", toRad);
 
+describe("list operations");
+{
+  const withLists = () => {
+    env.lists["L₁"] = [3, 1, 2];
+    env.lists["L₂"] = [10, 20, 30];
+  };
+  check("SortA(L₁)", "{1 2 3}", withLists);
+  check("L₁", "{1 2 3}");
+  check("SortD(L₁)", "{3 2 1}", withLists);
+  check("L₁", "{3 2 1}");
+  check("dim(L₂)", "3", withLists);
+  check("cumSum(L₂)", "{10 30 60}");
+  check("ΔList(L₂)", "{10 10}");
+  check("augment(L₁,L₂)", "{3 1 2 10 20 30}", withLists);
+  check("sum(L₂)", "60");
+  check("sum(L₂,2)", "50");
+  check("sum(L₂,1,2)", "30");
+  check("prod(L₂)", "6000");
+  check("prod(L₂,2,3)", "600");
+  check("Fill(7,L₁)", "{7 7 7}", withLists);
+  check("L₁", "{7 7 7}");
+  check("min(L₂)", "10");
+  check("max(L₂)", "30");
+  check("ΔList({5})", "ERR: DIM MISMATCH");
+  check("cumSum(seq(X,X,1,4))", "{1 3 6 10}");
+}
+
 reportIfMain(import.meta.url);

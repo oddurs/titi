@@ -112,10 +112,10 @@ export const ALL_KEYS: KeyDef[] = KEY_ROWS.flat().filter(
 );
 
 export const ARROW_KEYS: KeyDef[] = [
-  { id: "up", label: "▲", role: "control", act: "up" },
+  { id: "up", label: "▲", second: "lighter", role: "control", act: "up", act2: "contrast:up" },
   { id: "left", label: "◀", role: "control", act: "left" },
   { id: "right", label: "▶", role: "control", act: "right" },
-  { id: "down", label: "▼", role: "control", act: "down" },
+  { id: "down", label: "▼", second: "darker", role: "control", act: "down", act2: "contrast:down" },
 ];
 
 const BY_ID = new Map<string, KeyDef>(
@@ -132,3 +132,39 @@ export const KEYBOARD_MAP: Record<string, string> = {
   Enter: "enter", Backspace: "del", Delete: "del", Escape: "quit",
   ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
 };
+
+/**
+ * Where every key sits, for moving focus between them.
+ *
+ * Fifty buttons would otherwise be fifty tab stops in front of everything else
+ * on the page. The keypad is one stop instead and the arrows move inside it,
+ * which is how a grid of controls is meant to behave — and happens to be how
+ * the plastic one works too. The arrow cluster is a row of its own below the
+ * keypad proper, so it can be reached the same way.
+ */
+export const NAV: { id: string; row: number; col: number }[] = [
+  ...KEY_ROWS.flatMap((row, r) =>
+    row.flatMap((k, c) => (k ? [{ id: k.id, row: r, col: c }] : [])),
+  ),
+  ...ARROW_KEYS.map((a, i) => ({ id: a.id, row: KEY_ROWS.length, col: i })),
+];
+
+/** The key nearest in the given direction, or the same one at an edge. */
+export function stepFocus(fromId: string, dRow: number, dCol: number): string {
+  const from = NAV.find((n) => n.id === fromId) ?? NAV[0];
+  if (dCol) {
+    const inRow = NAV.filter((n) => n.row === from.row).sort((a, b) => a.col - b.col);
+    const at = inRow.findIndex((n) => n.id === from.id);
+    return inRow[Math.min(inRow.length - 1, Math.max(0, at + dCol))].id;
+  }
+  // Vertically, take the nearest column in the first row that has anything —
+  // the grid has gaps, so the row below is not always the row below.
+  for (let r = from.row + dRow; r >= 0 && r <= KEY_ROWS.length; r += dRow) {
+    const candidates = NAV.filter((n) => n.row === r);
+    if (!candidates.length) continue;
+    return candidates.reduce((best, n) =>
+      Math.abs(n.col - from.col) < Math.abs(best.col - from.col) ? n : best,
+    ).id;
+  }
+  return from.id;
+}

@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { ARROW_KEYS, KEY_ROWS, KEYBOARD_MAP, type KeyDef } from "@/lib/calc/keys";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ARROW_KEYS, KEY_ROWS, KEYBOARD_MAP, NAV, stepFocus, type KeyDef,
+} from "@/lib/calc/keys";
 import { useCalc } from "@/lib/calc/store";
 
 export default function Keypad() {
@@ -9,6 +11,8 @@ export default function Keypad() {
   const press = useCalc((s) => s.press);
   const typeText = useCalc((s) => s.typeText);
   const [flash, setFlash] = useState<string | null>(null);
+  const [focused, setFocused] = useState<string>(NAV[0].id);
+  const padRef = useRef<HTMLDivElement | null>(null);
 
   const hit = useCallback(
     (id: string) => {
@@ -26,6 +30,13 @@ export default function Keypad() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      // While focus is inside the keypad, the keypad owns the keys that
+      // operate a grid of buttons — arrows to move, Enter and Space to press.
+      // Everywhere else they drive the calculator directly.
+      const inPad = !!t && !!padRef.current?.contains(t);
+      if (inPad && (e.key.startsWith("Arrow") || e.key === "Enter" || e.key === " ")) {
+        return;
+      }
 
       const mapped = KEYBOARD_MAP[e.key];
       if (mapped) {
@@ -53,8 +64,34 @@ export default function Keypad() {
     return () => window.removeEventListener("keydown", onKey);
   }, [hit, typeText]);
 
+  /** Arrows move focus; the browser handles Enter and Space on the button. */
+  const onPadKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const moves: Record<string, [number, number]> = {
+      ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0],
+    };
+    const move = moves[e.key];
+    const next = move
+      ? stepFocus(focused, move[0], move[1])
+      : e.key === "Home"
+        ? NAV[0].id
+        : e.key === "End"
+          ? NAV[NAV.length - 1].id
+          : null;
+    if (!next) return;
+    e.preventDefault();
+    setFocused(next);
+    padRef.current?.querySelector<HTMLButtonElement>(`[data-key="${next}"]`)?.focus();
+  };
+
   return (
-    <div className="keypad" data-mod={mod} role="group" aria-label="Calculator keypad">
+    <div
+      className="keypad"
+      data-mod={mod}
+      role="group"
+      aria-label="Calculator keypad"
+      ref={padRef}
+      onKeyDown={onPadKeyDown}
+    >
       {KEY_ROWS.map((row, r) =>
         row.map((k, c) =>
           k ? (
@@ -66,6 +103,8 @@ export default function Keypad() {
               onHit={hit}
               row={r + 1}
               col={c + 1}
+              focused={focused === k.id}
+              onFocused={setFocused}
             />
           ) : null,
         ),
@@ -79,12 +118,18 @@ export default function Keypad() {
               key={a.id}
               className="arrow"
               data-dir={a.id}
+              data-key={a.id}
               data-pressed={flash === a.id}
+              tabIndex={focused === a.id ? 0 : -1}
+              onFocus={() => setFocused(a.id)}
               onPointerDown={(e) => {
                 e.preventDefault();
                 hit(a.id);
               }}
-              aria-label={a.id}
+              onClick={(e) => {
+                if (e.detail === 0) hit(a.id);
+              }}
+              aria-label={mod === "2nd" && a.second ? a.second : a.id}
             >
               {a.label}
             </button>
@@ -102,6 +147,8 @@ function Key({
   onHit,
   row,
   col,
+  focused,
+  onFocused,
 }: {
   k: KeyDef;
   mod: string;
@@ -109,6 +156,8 @@ function Key({
   onHit: (id: string) => void;
   row: number;
   col: number;
+  focused: boolean;
+  onFocused: (id: string) => void;
 }) {
   const armed =
     (k.role === "mod2nd" && mod === "2nd") ||
@@ -136,9 +185,16 @@ function Key({
           ((mod === "alpha" || mod === "alpha-lock") && !k.alpha))
       }
       style={{ gridRow: row, gridColumn: col }}
+      data-key={k.id}
+      tabIndex={focused ? 0 : -1}
+      onFocus={() => onFocused(k.id)}
       onPointerDown={(e) => {
         e.preventDefault();
         onHit(k.id);
+      }}
+      // A pointer press is handled on pointerdown; this is the keyboard path.
+      onClick={(e) => {
+        if (e.detail === 0) onHit(k.id);
       }}
       aria-label={effective}
     >

@@ -96,6 +96,8 @@ export interface Modes {
   labelAxes: boolean;
   grid: boolean;
   coordsOn: boolean;
+  /** 0–9, as on the device; 5 is the panel drawn at its own brightness */
+  contrast: number;
 }
 
 export interface TraceState {

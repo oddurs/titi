@@ -33,6 +33,7 @@ export const DEFAULT_MODES: Modes = {
   labelAxes: true,
   grid: true,
   coordsOn: true,
+  contrast: 5,
 };
 
 /** A full turn of the parameter, in whatever unit the angle mode uses. */

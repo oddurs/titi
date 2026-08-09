@@ -288,7 +288,7 @@ function renderTable(pen: Pen, s: CalcState, top: number) {
   for (let c = 0; c < cols; c++) {
     pen.text((c + 1) * colWidth, first, labels[s.ys.indexOf(shown[c])], INK.dim);
   }
-  pen.hline(0, pen.cols - 1, rowAt(0, first) + CHAR_H - 2, "#33526f");
+  pen.hline(0, pen.cols - 1, rowAt(0, first) + CHAR_H - 1, "#33526f");
 
   const rows = pen.textRows - first - 1;
   for (let r = 0; r < rows; r++) {
@@ -346,7 +346,7 @@ function renderStat(pen: Pen, s: CalcState, top: number) {
     const idx = startCol + c;
     pen.text(c * width, first, names[idx], idx === col ? INK.accent : INK.dim);
   }
-  pen.hline(0, pen.cols - 1, rowAt(0, first) + CHAR_H - 2, "#33526f");
+  pen.hline(0, pen.cols - 1, rowAt(0, first) + CHAR_H - 1, "#33526f");
 
   const depth = pen.textRows - first - 1;
   const startRow = Math.max(0, row - depth + 2);
@@ -394,7 +394,7 @@ function renderMatrix(pen: Pen, s: CalcState, top: number) {
   } else {
     pen.text(dimCol, first, dims, INK.dim);
   }
-  pen.hline(0, pen.cols - 1, rowAt(0, first) + CHAR_H - 2, "#33526f");
+  pen.hline(0, pen.cols - 1, rowAt(0, first) + CHAR_H - 1, "#33526f");
 
   if (!m) {
     pen.text(0, first + 2, "SET DIMENSIONS", INK.dim);
@@ -402,8 +402,15 @@ function renderMatrix(pen: Pen, s: CalcState, top: number) {
   }
 
   const depth = pen.textRows - first - 1;
-  const cellW = Math.max(5, Math.floor((pen.textCols - 1) / Math.min(m.c, 4)));
-  const shownCols = Math.max(1, Math.min(m.c, Math.floor((pen.textCols - 1) / cellW)));
+  // Wide enough for the widest entry, not simply the panel split evenly — a
+  // 2×2 of small integers should not sprawl across the whole screen.
+  const widest = m.m.reduce(
+    (w, row) =>
+      row.reduce((x, v) => Math.max(x, formatNumber(v, plain).length), w),
+    1,
+  );
+  const cellW = Math.min(10, Math.max(4, widest + 2));
+  const shownCols = Math.max(1, Math.min(m.c, Math.floor((pen.textCols - 2) / cellW)));
   const startCol = Math.max(0, Math.min(col - shownCols + 1, m.c - shownCols));
   const startRow = Math.max(0, Math.min(row - depth + 2, Math.max(0, m.r - depth + 1)));
 
@@ -426,7 +433,7 @@ function renderMatrix(pen: Pen, s: CalcState, top: number) {
         pen.text(at, line, clipped, INK.on);
       }
     }
-    pen.text(pen.textCols - 1, line, "]", INK.dim);
+    pen.text(1 + shownCols * cellW, line, "]", INK.dim);
   }
 }
 
@@ -436,7 +443,7 @@ function renderPrgmEdit(pen: Pen, s: CalcState, top: number, hits: HitRegion[]) 
   const first = Math.ceil(top / CHAR_H);
   const active = s.target.kind === "prgm" ? s.target.line : 0;
   pen.text(0, first, pen.clip(`PROGRAM:${s.prgmName}`, pen.textCols), INK.accent);
-  pen.hline(0, pen.cols - 1, rowAt(0, first) + CHAR_H - 2, "#33526f");
+  pen.hline(0, pen.cols - 1, rowAt(0, first) + CHAR_H - 1, "#33526f");
 
   const depth = pen.textRows - first - 1;
   const start = Math.max(0, Math.min(active - depth + 2, s.prgmLines.length - depth));

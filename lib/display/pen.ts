@@ -9,12 +9,15 @@
  */
 
 /**
- * A 5×7 glyph in a 6×8 cell — the geometry a TI-84 uses. Every glyph comes
- * from the ROM table, so nothing depends on how the browser happens to
- * rasterise a font at 8px.
+ * A 5×7 glyph in a 6×9 cell. Every glyph comes from the ROM table, so nothing
+ * depends on how the browser happens to rasterise a font.
+ *
+ * The extra row over a bare 6×8 cell is leading: with only one blank dot row
+ * between them, consecutive lines of digits run together and a dense screen
+ * like TABLE becomes unreadable.
  */
 export const CHAR_W = 6;
-export const CHAR_H = 8;
+export const CHAR_H = 9;
 /** Baseline offset inside a cell, for the rare glyph with no ROM entry. */
 const BASELINE = 7;
 

@@ -16,6 +16,7 @@ export type TokKind =
   | "list"
   | "yref"
   | "matref"
+  | "seqref"
   | "lbracket"
   | "rbracket"
   | "unknown";
@@ -85,6 +86,9 @@ export const FUNCTIONS = [
   "randM(",
   "Matr▸list(",
   "List▸matr(",
+  "real(",
+  "imag(",
+  "angle(",
 ] as const;
 
 const FN_CANON: Record<string, string> = {
@@ -137,6 +141,7 @@ const CONSTS: Record<string, string> = {
   "ℯ": "e",
   "rand": "rand",
   "∞": "inf",
+  "i": "i",
 };
 
 const VAR_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZθ";
@@ -189,6 +194,28 @@ export function lex(src: string): Token[] {
         i += fn.length;
         continue outer;
       }
+    }
+
+    // Sequence names and their index variable.
+    if (src.startsWith("nMin", i)) {
+      push("var", "nMin", "nMin", i);
+      i += 4;
+      continue;
+    }
+    if (src.startsWith("nMax", i)) {
+      push("var", "nMax", "nMax", i);
+      i += 4;
+      continue;
+    }
+    if (c === "n") {
+      push("var", "n", "n", i);
+      i += 1;
+      continue;
+    }
+    if (c === "u" || c === "v" || c === "w") {
+      push("seqref", c, c, i);
+      i += 1;
+      continue;
     }
 
     // Multi-char constants

@@ -5,6 +5,7 @@ export type Node =
   | { t: "list"; name: string }
   | { t: "yref"; name: string }
   | { t: "matref"; name: string }
+  | { t: "seqref"; name: string }
   | { t: "matlit"; rows: Node[][] }
   | { t: "call"; name: string; args: Node[] }
   | { t: "bin"; op: string; l: Node; r: Node; implicit?: boolean }

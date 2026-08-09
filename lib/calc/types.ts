@@ -1,5 +1,15 @@
 import type { NotationMode } from "../math/format";
 
+export interface SolverState {
+  equation: string;
+  /** variable name → value; the target's value is the answer */
+  values: Record<string, number>;
+  target: string;
+  bound: [number, number];
+  /** how far the equation is from zero at the answer, once solved */
+  residual: number | null;
+}
+
 export interface PrgmRun {
   name: string;
   output: string[];
@@ -21,6 +31,7 @@ export type ScreenId =
   | "matrix"
   | "prgm"
   | "prgmrun"
+  | "solver"
   | "format";
 
 export type Modifier = "none" | "2nd" | "alpha" | "alpha-lock";
@@ -64,6 +75,9 @@ export interface GraphWindow {
   tmin: number;
   tmax: number;
   tstep: number;
+  /** index bounds for sequence mode */
+  nmin: number;
+  nmax: number;
 }
 
 export interface TableSetup {
@@ -73,8 +87,9 @@ export interface TableSetup {
 }
 
 export interface Modes {
-  graphMode: "func" | "par" | "pol";
+  graphMode: "func" | "par" | "pol" | "seq";
   angle: "rad" | "deg";
+  complex: "real" | "a+bi";
   notation: NotationMode;
   decimals: number;
   connected: boolean;
@@ -140,4 +155,6 @@ export type EditTarget =
   | { kind: "stat"; col: number; row: number }
   /** row -1 addresses the dimension line, where col 0 is rows and 1 is columns */
   | { kind: "matrix"; name: string; row: number; col: number }
-  | { kind: "prgm"; line: number };
+  | { kind: "prgm"; line: number }
+  /** row 0 is the equation, then one row per variable, then the bounds */
+  | { kind: "solver"; row: number };

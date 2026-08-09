@@ -24,6 +24,7 @@ const ARITY: Record<string, [number, number]> = {
   det: [1, 1], identity: [1, 1], rref: [1, 1], ref: [1, 1],
   augment: [2, 2], dim: [1, 1], Fill: [2, 2], randM: [2, 2],
   matr2list: [2, 2], list2matr: [1, 9],
+  real: [1, 1], imag: [1, 1], angle: [1, 1], "@seq": [2, 2],
   normalpdf: [1, 3], normalcdf: [2, 4], invNorm: [1, 3],
   binompdf: [2, 3], binomcdf: [2, 3], solve: [2, 4],
 };
@@ -136,6 +137,7 @@ class Parser {
       t.kind === "list" ||
       t.kind === "yref" ||
       t.kind === "matref" ||
+      t.kind === "seqref" ||
       t.kind === "lbracket" ||
       t.kind === "lparen"
     );
@@ -167,6 +169,13 @@ class Parser {
       const arg = this.parseSum();
       this.closeParen();
       e = { t: "call", name: "@y", args: [{ t: "yref", name: e.name }, arg] };
+    }
+    // u(n-1) is a term of a sequence, not u times (n-1).
+    if (e.t === "seqref" && this.at("lparen")) {
+      this.next();
+      const arg = this.parseSum();
+      this.closeParen();
+      e = { t: "call", name: "@seq", args: [{ t: "seqref", name: e.name }, arg] };
     }
     for (;;) {
       const t = this.peek();
@@ -248,6 +257,10 @@ class Parser {
     if (t.kind === "matref") {
       this.next();
       return { t: "matref", name: t.value };
+    }
+    if (t.kind === "seqref") {
+      this.next();
+      return { t: "seqref", name: t.value };
     }
     if (t.kind === "lbracket") return this.parseMatrixLiteral();
 

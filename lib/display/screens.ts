@@ -2,7 +2,7 @@ import { formatNumber } from "../math/format";
 import { evaluate } from "../math/eval";
 import { slotLabels } from "../calc/curves";
 import { PLOT_COLORS } from "../calc/colors";
-import { MODE_ROWS, visibleWindowFields, windowLabel } from "../calc/layout";
+import { MODE_ROWS, solverRows, visibleWindowFields, windowLabel } from "../calc/layout";
 import type { CalcState } from "../calc/store";
 import { CHAR_H, CHAR_W, INK, Pen } from "./pen";
 import { graphReadout, renderGraph } from "./graph";
@@ -37,6 +37,7 @@ const TITLES: Record<string, string> = {
   matrix: "MATRIX",
   prgm: "PRGM EDIT",
   prgmrun: "PRGM",
+  solver: "SOLVER",
   format: "FORMAT",
 };
 
@@ -48,9 +49,8 @@ function chrome(pen: Pen, s: CalcState): number {
   const bits: string[] = [];
   if (s.screen === "graph" && s.trace) bits.push("TRACE");
   bits.push(s.modes.angle === "rad" ? "RAD" : "DEG");
-  if (s.modes.graphMode !== "func") {
-    bits.push(s.modes.graphMode === "par" ? "PAR" : "POL");
-  }
+  const modeTag = { func: "", par: "PAR", pol: "POL", seq: "SEQ" } as const;
+  if (modeTag[s.modes.graphMode]) bits.push(modeTag[s.modes.graphMode]);
   if (s.mod === "2nd") bits.push("2ND");
   if (s.mod === "alpha" || s.mod === "alpha-lock") bits.push("A");
 
@@ -88,6 +88,7 @@ export function renderScreen(pen: Pen, s: CalcState): HitRegion[] {
     case "matrix": renderMatrix(pen, s, top); break;
     case "prgm": renderPrgmEdit(pen, s, top, hits); break;
     case "prgmrun": renderPrgmRun(pen, s, top); break;
+    case "solver": renderSolver(pen, s, top, hits); break;
   }
 
   if (s.message) renderToast(pen, s.message);
@@ -438,6 +439,41 @@ function renderMatrix(pen: Pen, s: CalcState, top: number) {
 }
 
 // ---------------------------------------------------------------------------
+
+function renderSolver(pen: Pen, s: CalcState, top: number, hits: HitRegion[]) {
+  const first = Math.ceil(top / CHAR_H);
+  const rows = solverRows(s.solver);
+  const active = s.target.kind === "solver" ? s.target.row : -1;
+
+  rows.forEach((r, i) => {
+    const row = first + i;
+    if (row >= pen.textRows - 1) return;
+    // The variable being solved for is marked, as it is on the device.
+    const mark = r.kind === "var" && r.isTarget ? "*" : " ";
+    const label = `${mark}${r.label}`;
+    pen.text(0, row, label, r.isTarget ? INK.accent : INK.dim);
+
+    const col = label.length;
+    const width = pen.textCols - col;
+    if (i === active) {
+      const shown = tailFit(s.entry.text, s.entry.caret, width);
+      pen.text(col, row, shown.text, INK.on);
+      pen.cursor(col + shown.caret, row);
+    } else {
+      pen.text(col, row, pen.clip(r.value, width), INK.on);
+    }
+    hits.push({ kind: "row", index: i, x: 0, y: rowAt(0, row) - 1, w: pen.cols, h: CHAR_H });
+  });
+
+  const foot = pen.textRows - 1;
+  if (s.solver.residual !== null) {
+    pen.text(0, foot, pen.clip(`left-rt=${formatNumber(s.solver.residual, plain)}`, pen.textCols), INK.dim);
+  } else if (!s.solver.equation.trim()) {
+    pen.text(0, foot, "ENTER AN EQUATION", INK.dim);
+  } else {
+    pen.text(0, foot, "ENTER ON A VAR SOLVES", INK.dim);
+  }
+}
 
 function renderPrgmEdit(pen: Pen, s: CalcState, top: number, hits: HitRegion[]) {
   const first = Math.ceil(top / CHAR_H);

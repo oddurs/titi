@@ -18,6 +18,7 @@ export default function Screen() {
   const panelRef = useRef<DotPanel | null>(null);
   const hitsRef = useRef<HitRegion[]>([]);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const [transcript, setTranscript] = useState<string[]>([]);
   // Almost everything comes from the character ROM, but canvas cannot resolve
   // CSS variables in ctx.font and never triggers a font download on its own —
   // so the fallback stack is resolved and loaded before the first paint.
@@ -76,6 +77,7 @@ export default function Screen() {
     const pen = new Pen(panel.ctx, m.cols, m.rows, fontStack);
     hitsRef.current = renderScreen(pen, state);
     panel.present(target);
+    setTranscript(pen.transcript());
   }, [size, state, fontStack]);
 
   // -- pointer --------------------------------------------------------------
@@ -243,7 +245,17 @@ export default function Screen() {
           onPointerCancel={onPointerUp}
           onWheel={onWheel}
         >
-          <canvas ref={canvasRef} className="panel" />
+          <canvas
+            ref={canvasRef}
+            className="panel"
+            role="img"
+            aria-label={`Calculator display: ${transcript.join(". ")}`}
+          />
+        </div>
+        {/* The panel is a canvas, so its contents are mirrored here for
+            assistive technology. */}
+        <div className="sr-only" role="status" aria-live="polite">
+          {transcript.join(". ")}
         </div>
       </div>
     </div>

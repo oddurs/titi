@@ -2,8 +2,12 @@ import type { Node } from "./ast";
 import { parse } from "./parser";
 import * as M from "./matrix";
 import { MatrixError, isMatrix, type Matrix } from "./matrix";
+import * as C from "./complex";
+import { isComplex, type Complex } from "./complex";
 
-export type Val = number | number[] | Matrix;
+export type Val = number | number[] | Matrix | Complex;
+/** A scalar, real or complex. */
+export type Scalar = number | Complex;
 
 export class CalcError extends Error {
   constructor(message: string) {
@@ -18,9 +22,13 @@ export interface Env {
   /** Y₁..Y₆ source expressions, keyed by their subscript glyph name. */
   ys: Record<string, string>;
   angle: "rad" | "deg";
+  /** Real mode refuses non-real answers; a+bi returns them. */
+  complex: "real" | "a+bi";
   ans: Val;
   /** [A]..[J] */
   mats: Record<string, Matrix>;
+  /** term functions for u, v and w, so a definition can reference any of them */
+  seqTerms?: Record<string, (n: number) => number>;
   /** When true, domain errors yield NaN instead of throwing (plotting/tables). */
   lenient: boolean;
 }
@@ -28,12 +36,15 @@ export interface Env {
 export function makeEnv(partial: Partial<Env> = {}): Env {
   const vars: Record<string, number> = {};
   for (const c of "ABCDEFGHIJKLMNOPQRSTUVWXYZθ") vars[c] = 0;
+  vars.n = 0;
+  vars.nMin = 1;
   return {
     vars,
     lists: {},
     ys: {},
     mats: {},
     angle: "rad",
+    complex: "real",
     ans: 0,
     lenient: false,
     ...partial,
@@ -46,8 +57,15 @@ const TAU = Math.PI * 2;
 
 const num = (v: Val): number => {
   if (typeof v === "number") return v;
+  if (isComplex(v) && v.im === 0) return v.re;
   throw new CalcError("ERR: DATA TYPE");
 };
+
+const isScalar = (v: Val): v is Scalar =>
+  typeof v === "number" || isComplex(v);
+
+/** Apply a complex function and collapse the result back to a real if it is one. */
+const asVal = (z: Complex): Val => C.simplify(C.tidy(z));
 
 const fail = (env: Env, msg: string): number => {
   if (env.lenient) return NaN;
@@ -58,7 +76,20 @@ const fail = (env: Env, msg: string): number => {
 function map1(v: Val, f: (x: number) => number): Val {
   if (typeof v === "number") return f(v);
   if (isMatrix(v)) return M.mapMatrix(v, f);
+  if (isComplex(v)) throw new CalcError("ERR: DATA TYPE");
   return v.map(f);
+}
+
+/** True when either side is complex, in which case the real path cannot serve. */
+const eitherComplex = (a: Val, b: Val) => isComplex(a) || isComplex(b);
+
+/**
+ * Both operands as complex, or a type error. A complex never combines with a
+ * list or a matrix — those stay strictly real.
+ */
+function complexPair(a: Val, b: Val): [Complex, Complex] {
+  if (!isScalar(a) || !isScalar(b)) throw new CalcError("ERR: DATA TYPE");
+  return [C.toComplex(a), C.toComplex(b)];
 }
 
 function map2(a: Val, b: Val, f: (x: number, y: number) => number): Val {
@@ -72,10 +103,13 @@ function map2(a: Val, b: Val, f: (x: number, y: number) => number): Val {
     return M.mapMatrix(b as Matrix, (y) => f(a, y));
   }
   if (typeof a === "number" && typeof b === "number") return f(a, b);
+  if (isComplex(a) || isComplex(b)) throw new CalcError("ERR: DATA TYPE");
   if (typeof a === "number") return (b as number[]).map((y) => f(a, y));
   if (typeof b === "number") return (a as number[]).map((x) => f(x, b));
-  if (a.length !== b.length) throw new CalcError("ERR: DIM MISMATCH");
-  return a.map((x, i) => f(x, b[i]));
+  const la = a as number[];
+  const lb = b as number[];
+  if (la.length !== lb.length) throw new CalcError("ERR: DIM MISMATCH");
+  return la.map((x, i) => f(x, lb[i]));
 }
 
 /** Scalar `^`, with the device's domain rules. */
@@ -92,7 +126,7 @@ const asMatrix = (v: Val): Matrix => {
 
 const asList = (v: Val): number[] => {
   if (typeof v === "number") return [v];
-  if (isMatrix(v)) throw new CalcError("ERR: DATA TYPE");
+  if (isMatrix(v) || isComplex(v)) throw new CalcError("ERR: DATA TYPE");
   return v;
 };
 
@@ -360,6 +394,7 @@ export function compile(node: Node): Fn {
         case "inf": return () => Infinity;
         case "rand": return () => Math.random();
         case "Ans": return (env) => env.ans;
+        case "i": return () => C.cx(0, 1);
         case "E": return () => 10;
         default: return () => 0;
       }
@@ -389,6 +424,13 @@ export function compile(node: Node): Fn {
       return (env) => compileY(env, n)(env);
     }
 
+    case "seqref": {
+      // A bare u without an index is not a value on its own.
+      return () => {
+        throw new CalcError("ERR: SYNTAX");
+      };
+    }
+
     case "matref": {
       const n = node.name;
       return (env) => {
@@ -406,7 +448,10 @@ export function compile(node: Node): Fn {
 
     case "neg": {
       const e = compile(node.e);
-      return (env) => map1(e(env), (x) => -x);
+      return (env) => {
+        const v = e(env);
+        return isComplex(v) ? asVal(C.neg(v)) : map1(v, (x) => -x);
+      };
     }
 
     case "post": {
@@ -416,6 +461,7 @@ export function compile(node: Node): Fn {
           return (env) => {
             const v = e(env);
             if (isMatrix(v)) return lift(() => M.power(v, 2));
+            if (isComplex(v)) return asVal(C.mul(v, v));
             return map1(v, (x) => x * x);
           };
         case "³":
@@ -430,6 +476,7 @@ export function compile(node: Node): Fn {
           return (env) => {
             const v = e(env);
             if (isMatrix(v)) return lift(() => M.inverse(v));
+            if (isComplex(v)) return asVal(C.div(C.cx(1), v));
             return map1(v, (x) => (x === 0 ? fail(env, "ERR: DIVIDE BY 0") : 1 / x));
           };
         case "!":
@@ -461,14 +508,33 @@ export function compile(node: Node): Fn {
       const l = compile(node.l);
       const r = compile(node.r);
       switch (node.op) {
-        case "+": return (env) => map2(l(env), r(env), (a, b) => a + b);
-        case "-": return (env) => map2(l(env), r(env), (a, b) => a - b);
+        case "+":
+          return (env) => {
+            const a = l(env);
+            const b = r(env);
+            if (eitherComplex(a, b)) {
+              return asVal(C.add(...complexPair(a, b)));
+            }
+            return map2(a, b, (x, y) => x + y);
+          };
+        case "-":
+          return (env) => {
+            const a = l(env);
+            const b = r(env);
+            if (eitherComplex(a, b)) {
+              return asVal(C.sub(...complexPair(a, b)));
+            }
+            return map2(a, b, (x, y) => x - y);
+          };
         case "*":
           return (env) => {
             const a = l(env);
             const b = r(env);
             // matrix × matrix is the real product, not element-wise
             if (isMatrix(a) && isMatrix(b)) return lift(() => M.mul(a, b));
+            if (eitherComplex(a, b)) {
+              return asVal(C.mul(...complexPair(a, b)));
+            }
             return map2(a, b, (x, y) => x * y);
           };
         case "/":
@@ -476,6 +542,11 @@ export function compile(node: Node): Fn {
             const a = l(env);
             const b = r(env);
             if (isMatrix(b)) throw new CalcError("ERR: DATA TYPE");
+            if (eitherComplex(a, b)) {
+              const [x, d] = complexPair(a, b);
+              if (d.re === 0 && d.im === 0) return fail(env, "ERR: DIVIDE BY 0");
+              return asVal(C.div(x, d));
+            }
             return map2(a, b, (x, y) =>
               y === 0 ? fail(env, "ERR: DIVIDE BY 0") : x / y,
             );
@@ -485,6 +556,17 @@ export function compile(node: Node): Fn {
             const a = l(env);
             const b = r(env);
             if (isMatrix(a)) return lift(() => M.power(a, num(b)));
+            if (eitherComplex(a, b)) {
+              return asVal(C.pow(...complexPair(a, b)));
+            }
+            // A negative base to a fractional power leaves the reals.
+            if (
+              isScalar(a) && isScalar(b) &&
+              typeof a === "number" && typeof b === "number" &&
+              a < 0 && !Number.isInteger(b) && env.complex === "a+bi"
+            ) {
+              return asVal(C.pow(C.cx(a), C.cx(b)));
+            }
             return map2(a, b, (x, y) => matPowScalar(env, x, y));
           };
         case "=": return (env) => map2(l(env), r(env), (a, b) => (a === b ? 1 : 0));
@@ -510,6 +592,17 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
     return compileSpecial(node);
   }
 
+  if (name === "@seq") {
+    const seqName = (args[0] as Extract<Node, { t: "seqref" }>).name;
+    const arg = compile(args[1]);
+    return (env) => {
+      const term = env.seqTerms?.[seqName];
+      if (!term) throw new CalcError("ERR: UNDEFINED");
+      const n = num(arg(env));
+      return term(n);
+    };
+  }
+
   if (name === "@y") {
     const yname = (args[0] as Extract<Node, { t: "yref" }>).name;
     const arg = compile(args[1]);
@@ -531,37 +624,81 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
   const s1 = (f: (x: number, env: Env) => number): Fn => (env) =>
     map1(a[0](env), (x) => f(x, env));
 
+  /**
+   * A function that has a complex continuation. The real path runs unless the
+   * argument is already complex, or the real input leaves the reals and the
+   * mode allows following it.
+   */
+  const s1c = (
+    real: (x: number, env: Env) => number,
+    complexFn: (z: Complex) => Complex,
+    escapes: (x: number) => boolean = () => false,
+  ): Fn => (env) => {
+    const v = a[0](env);
+    if (isComplex(v)) return asVal(complexFn(v));
+    if (typeof v === "number" && escapes(v) && env.complex === "a+bi") {
+      return asVal(complexFn(C.cx(v)));
+    }
+    return map1(v, (x) => real(x, env));
+  };
+
   switch (name) {
-    case "sin": return (env) => map1(a[0](env), (x) => snapTrig(Math.sin(toRad(env, x))));
-    case "cos": return (env) => map1(a[0](env), (x) => snapTrig(Math.cos(toRad(env, x))));
+    case "sin":
+      return s1c((x, env) => snapTrig(Math.sin(toRad(env, x))), C.sin);
+    case "cos":
+      return s1c((x, env) => snapTrig(Math.cos(toRad(env, x))), C.cos);
     case "tan":
-      return (env) =>
-        map1(a[0](env), (x) => {
+      return (env) => {
+        const v0 = a[0](env);
+        if (isComplex(v0)) return asVal(C.tan(v0));
+        return map1(v0, (x) => {
           const r = toRad(env, x);
           const c = Math.cos(r);
           if (Math.abs(c) < 1e-15) return fail(env, "ERR: DOMAIN");
           const s = Math.sin(r);
           return Math.abs(s) < 1e-15 ? 0 : s / c;
         });
+      };
     case "asin": return s1((x, env) => (Math.abs(x) > 1 ? fail(env, "ERR: DOMAIN") : fromRad(env, Math.asin(x))));
     case "acos": return s1((x, env) => (Math.abs(x) > 1 ? fail(env, "ERR: DOMAIN") : fromRad(env, Math.acos(x))));
     case "atan": return s1((x, env) => fromRad(env, Math.atan(x)));
-    case "sinh": return s1(Math.sinh);
-    case "cosh": return s1(Math.cosh);
-    case "tanh": return s1(Math.tanh);
+    case "sinh": return s1c(Math.sinh, C.sinh);
+    case "cosh": return s1c(Math.cosh, C.cosh);
+    case "tanh": return s1c(Math.tanh, C.tanh);
     case "asinh": return s1(Math.asinh);
     case "acosh": return s1((x, env) => (x < 1 ? fail(env, "ERR: DOMAIN") : Math.acosh(x)));
     case "atanh": return s1((x, env) => (Math.abs(x) >= 1 ? fail(env, "ERR: DOMAIN") : Math.atanh(x)));
 
     case "log":
       if (a.length === 2) {
-        return (env) => map2(a[0](env), a[1](env), (x, b) => Math.log(x) / Math.log(b));
+        return (env) => {
+          const x = a[0](env);
+          const b = a[1](env);
+          if (eitherComplex(x, b)) {
+            return asVal(C.logBase(...complexPair(x, b)));
+          }
+          return map2(x, b, (v, base) => Math.log(v) / Math.log(base));
+        };
       }
-      return s1((x, env) => (x <= 0 ? fail(env, x === 0 ? "ERR: DIVIDE BY 0" : "ERR: NONREAL ANS") : Math.log10(x)));
+      return s1c(
+        (x, env) =>
+          x <= 0 ? fail(env, x === 0 ? "ERR: DIVIDE BY 0" : "ERR: NONREAL ANS") : Math.log10(x),
+        (z) => C.div(C.log(z), C.cx(Math.LN10)),
+        (x) => x < 0,
+      );
     case "ln":
-      return s1((x, env) => (x <= 0 ? fail(env, x === 0 ? "ERR: DIVIDE BY 0" : "ERR: NONREAL ANS") : Math.log(x)));
+      return s1c(
+        (x, env) =>
+          x <= 0 ? fail(env, x === 0 ? "ERR: DIVIDE BY 0" : "ERR: NONREAL ANS") : Math.log(x),
+        C.log,
+        (x) => x < 0,
+      );
     case "sqrt":
-      return s1((x, env) => (x < 0 ? fail(env, "ERR: NONREAL ANS") : Math.sqrt(x)));
+      return s1c(
+        (x, env) => (x < 0 ? fail(env, "ERR: NONREAL ANS") : Math.sqrt(x)),
+        C.sqrt,
+        (x) => x < 0,
+      );
     case "cbrt": return s1(Math.cbrt);
     case "xroot":
       return (env) =>
@@ -572,10 +709,37 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
           }
           return Math.pow(x, 1 / n);
         });
-    case "pow10": return s1((x) => Math.pow(10, x));
-    case "expe": return s1(Math.exp);
-    case "abs": return s1(Math.abs);
-    case "conj": return s1((x) => x);
+    case "pow10":
+      return s1c((x) => Math.pow(10, x), (z) => C.pow(C.cx(10), z));
+    case "expe": return s1c(Math.exp, C.exp);
+    case "abs":
+      return (env) => {
+        const v = a[0](env);
+        // |a+bi| is the modulus, and it is real
+        if (isComplex(v)) return C.abs(v);
+        return map1(v, Math.abs);
+      };
+    case "conj":
+      return (env) => {
+        const v = a[0](env);
+        return isComplex(v) ? asVal(C.conj(v)) : v;
+      };
+    case "real":
+      return (env) => {
+        const v = a[0](env);
+        return isComplex(v) ? v.re : map1(v, (x) => x);
+      };
+    case "imag":
+      return (env) => {
+        const v = a[0](env);
+        return isComplex(v) ? v.im : map1(v, () => 0);
+      };
+    case "angle":
+      return (env) => {
+        const v = a[0](env);
+        const z = isComplex(v) ? v : C.cx(num(v));
+        return fromRad(env, C.arg(z));
+      };
     case "int": return s1(Math.floor);
     case "iPart": return s1(Math.trunc);
     case "fPart": return s1((x) => x - Math.trunc(x));

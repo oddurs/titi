@@ -5,6 +5,8 @@ import "./program.test";
 import "./stats.test";
 import "./curves.test";
 import "./glyphs.test";
+import "./complex.test";
+import "./solver.test";
 import { report } from "./harness";
 
 report();

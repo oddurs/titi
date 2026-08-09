@@ -1,4 +1,5 @@
 import { isMatrix, type Matrix } from "./matrix";
+import { isComplex, type Complex } from "./complex";
 
 export type NotationMode = "normal" | "sci" | "eng";
 /** -1 means Float; 0–9 fix that many decimal places. */
@@ -84,11 +85,23 @@ export function formatNumber(x: number, opts: FormatOpts): string {
   return stripLeadingZero(stripZeros(v.toFixed(Math.min(dp, 14))));
 }
 
+/** a+bi, with the parts written the way any other number would be. */
+export function formatComplex(z: Complex, opts: FormatOpts): string {
+  const re = formatNumber(z.re, opts);
+  const im = formatNumber(Math.abs(z.im), opts);
+  const sign = z.im < 0 ? "-" : "+";
+  // The device writes i rather than 1i, and drops a zero real part.
+  const imPart = im === "1" ? "i" : `${im}i`;
+  if (z.re === 0) return z.im < 0 ? `-${imPart}` : imPart;
+  return `${re}${sign}${imPart}`;
+}
+
 export function formatValue(
-  v: number | number[] | Matrix,
+  v: number | number[] | Matrix | Complex,
   opts: FormatOpts,
 ): string {
   if (typeof v === "number") return formatNumber(v, opts);
+  if (isComplex(v)) return formatComplex(v, opts);
   if (isMatrix(v)) {
     return v.m
       .map((row) => `[${row.map((x) => formatNumber(x, opts)).join(" ")}]`)

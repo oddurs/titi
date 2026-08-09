@@ -265,7 +265,8 @@ export function graphReadout(g: GraphInput): string[] | null {
   const finite = Number.isFinite(p.x) && Number.isFinite(p.y);
   const out = [c.label];
   if (!c.isFunction) {
-    const label = g.modes.graphMode === "pol" ? "θ" : "T";
+    const label =
+      g.modes.graphMode === "pol" ? "θ" : g.modes.graphMode === "seq" ? "n" : "T";
     out.push(`${label}=${trim(formatNumber(g.trace.x, fmt))}`);
   }
   out.push(`X=${finite ? trim(formatNumber(p.x, fmt)) : "-"}`);

@@ -29,9 +29,11 @@ npm run build      # static export to ./out
 `STO▸`. Answers carry ten significant digits and drop the leading zero, so `7÷8`
 reads `.875`.
 
-**Graphing.** Function, parametric and polar, chosen under `MODE`. The six
-slots are reinterpreted rather than duplicated: `Y₁`–`Y₆` in function mode,
-`r₁`–`r₆` in polar, and pairs of `Xₙₜ`/`Yₙₜ` in parametric. Per-pixel adaptive
+**Graphing.** Function, parametric, polar and sequence, chosen under `MODE`.
+The six slots are reinterpreted rather than duplicated: `Y₁`–`Y₆` in function
+mode, `r₁`–`r₆` in polar, pairs of `Xₙₜ`/`Yₙₜ` in parametric, and `u`, `v`, `w`
+with their initial terms in sequence mode — where a definition may refer to
+`u(n-1)` or to either of the other two. Per-pixel adaptive
 sampling with pole detection, so `tan(X)` breaks at its asymptotes instead of
 drawing vertical lines. Drag to pan, wheel or pinch to zoom, drag to trace. The
 full `ZOOM` menu including `ZBox`, `ZSquare` and a `ZoomFit` that fits both axes
@@ -52,7 +54,14 @@ ship with it; `PRGM ▸ NEW` writes your own.
 **Calculus and analysis.** `CALC` gives zero, minimum, maximum, intersect,
 `dy/dx` and `∫f(x)dx` with shaded area — backed by Brent's method,
 golden-section search and adaptive Simpson quadrature. `nDeriv(`, `fnInt(` and
-`solve(` are available as expressions too.
+`solve(` are available as expressions too, and `MATH ▸ Solver` opens an
+equation editor that will solve for any variable in it.
+
+**Complex numbers.** `MODE` switches between Real and `a+bi`. In Real mode
+`√(-1)` is an error, as it is on the device; in `a+bi` it is `i`, and the
+arithmetic, roots, logs, exponentials and hyperbolics all follow. `abs(`
+returns the modulus, and `conj(`, `real(`, `imag(` and `angle(` do what they
+say.
 
 **Statistics.** A six-list editor, 1-Var and 2-Var stats, and five regressions —
 `LinReg(ax+b)`, `QuadReg`, `ExpReg`, `LnReg` and `PwrReg` — each writing its fit
@@ -90,6 +99,8 @@ lib/
     parser.ts        precedence climbing, TI's associativity rules
     eval.ts          AST → (env) => value, plus root/integral solvers
     matrix.ts        dense real linear algebra
+    complex.ts       complex arithmetic, used only off the real line
+    solver.ts        equation solving over the root finder
     program.ts       the suspendable TI-BASIC interpreter
     format.ts        ten-significant-digit display, ▸Frac
     stats.ts         1-Var, 2-Var, and five regressions
@@ -142,12 +153,19 @@ Source → GitHub Actions**.
 in from `actions/configure-pages`, and it stays empty for local builds, user
 sites and custom domains.
 
+## Accessibility
+
+The display is a canvas, so it would say nothing to a screen reader on its own.
+The pen records every string it draws, and that transcript is mirrored into a
+live region — the panel's contents in words, from the same call that drew them.
+The keypad is real buttons throughout, labelled with whatever the active
+modifier makes them do.
+
 ## Not implemented
 
-There is no complex-number mode, so `√(-1)` returns `ERR: NONREAL ANS`, as the
-device does in real mode. `CALC` is defined against `y(x)` and says so rather
-than guessing in parametric and polar modes. Sequence graphing, the finance
-solver and `APPS` are absent.
+`CALC` is defined against `y(x)` and says so rather than guessing in the other
+graph modes. The finance solver and `APPS` are absent, and complex values stay
+out of lists and matrices.
 
 ## License
 

@@ -7,19 +7,26 @@ import type { Modes } from "./types";
  */
 
 export const WINDOW_FIELDS = [
+  "nmin", "nmax",
   "tmin", "tmax", "tstep",
   "xmin", "xmax", "xscl", "ymin", "ymax", "yscl", "xres",
 ] as const;
 
-/** The parameter bounds only exist in parametric and polar modes. */
-export const visibleWindowFields = (mode: Modes["graphMode"]) =>
-  mode === "func" ? WINDOW_FIELDS.slice(3) : WINDOW_FIELDS;
+const PLOT_FIELDS = WINDOW_FIELDS.slice(5);
+
+/** Each mode shows only the bounds it actually uses. */
+export const visibleWindowFields = (mode: Modes["graphMode"]) => {
+  if (mode === "seq") return [...WINDOW_FIELDS.slice(0, 2), ...PLOT_FIELDS];
+  if (mode === "func") return PLOT_FIELDS;
+  return [...WINDOW_FIELDS.slice(2, 5), ...PLOT_FIELDS];
+};
 export type WindowField = (typeof WINDOW_FIELDS)[number];
 
 export const WINDOW_LABELS: Record<WindowField, string> = {
   xmin: "Xmin", xmax: "Xmax", xscl: "Xscl",
   ymin: "Ymin", ymax: "Ymax", yscl: "Yscl", xres: "Xres",
   tmin: "Tmin", tmax: "Tmax", tstep: "Tstep",
+  nmin: "nMin", nmax: "nMax",
 };
 
 /** Polar mode calls the same three fields θ rather than T. */
@@ -43,8 +50,9 @@ export const MODE_ROWS: ModeOption[] = [
     hint: "what the Y= slots mean",
     choices: [
       { value: "func", label: "Func" },
-      { value: "par", label: "Parametric" },
+      { value: "par", label: "Param" },
       { value: "pol", label: "Polar" },
+      { value: "seq", label: "Seq" },
     ],
   },
   {
@@ -70,6 +78,14 @@ export const MODE_ROWS: ModeOption[] = [
     choices: [
       { value: "rad", label: "Radian" },
       { value: "deg", label: "Degree" },
+    ],
+  },
+  {
+    key: "complex",
+    hint: "answers outside the reals",
+    choices: [
+      { value: "real", label: "Real" },
+      { value: "a+bi", label: "a+bi" },
     ],
   },
   {
@@ -105,3 +121,36 @@ export const MODE_ROWS: ModeOption[] = [
     ],
   },
 ];
+
+/** One editable row per line of the solver screen. */
+export interface SolverRow {
+  kind: "equation" | "var" | "lower" | "upper";
+  label: string;
+  value: string;
+  /** set for kind "var" */
+  name?: string;
+  /** the variable being solved for */
+  isTarget?: boolean;
+}
+
+import type { SolverState } from "./types";
+import { formatNumber } from "../math/format";
+
+export function solverRows(s: SolverState): SolverRow[] {
+  const plain = { notation: "normal" as const, decimals: -1 };
+  const rows: SolverRow[] = [
+    { kind: "equation", label: "0=", value: s.equation },
+  ];
+  for (const name of Object.keys(s.values)) {
+    rows.push({
+      kind: "var",
+      label: `${name}=`,
+      value: formatNumber(s.values[name], plain),
+      name,
+      isTarget: name === s.target,
+    });
+  }
+  rows.push({ kind: "lower", label: "bound{", value: formatNumber(s.bound[0], plain) });
+  rows.push({ kind: "upper", label: "bound}", value: formatNumber(s.bound[1], plain) });
+  return rows;
+}

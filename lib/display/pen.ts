@@ -35,12 +35,39 @@ export type Ink = string;
 import { GLYPHS, foldForDisplay } from "./glyphs";
 
 export class Pen {
+  /**
+   * Every string drawn, with where it landed. A canvas says nothing to a
+   * screen reader, so this is replayed into a live region — the panel's
+   * contents in words, straight from the same call that drew them.
+   */
+  readonly spoken: { x: number; y: number; text: string }[] = [];
+
   constructor(
     readonly ctx: CanvasRenderingContext2D,
     readonly cols: number,
     readonly rows: number,
     private fontStack: string,
   ) {}
+
+  /** The panel's text, reading order, one string per line. */
+  transcript(): string[] {
+    const lines = new Map<number, { x: number; text: string }[]>();
+    for (const item of this.spoken) {
+      const row = Math.round(item.y / CHAR_H);
+      if (!lines.has(row)) lines.set(row, []);
+      lines.get(row)!.push(item);
+    }
+    return [...lines.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([, parts]) =>
+        parts
+          .sort((a, b) => a.x - b.x)
+          .map((p) => p.text)
+          .join(" ")
+          .trim(),
+      )
+      .filter((l) => l !== "");
+  }
 
   /** Character columns and rows that fit on this panel. */
   get textCols(): number {
@@ -130,6 +157,7 @@ export class Pen {
   textAt(x: number, y: number, s: string, ink: Ink = INK.on): number {
     if (!s) return 0;
     const text = foldForDisplay(s);
+    if (s.trim()) this.spoken.push({ x, y, text: s.trim() });
     this.ctx.fillStyle = ink;
     this.ctx.font = this.fontStack;
     this.ctx.textBaseline = "alphabetic";

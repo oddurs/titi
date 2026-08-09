@@ -57,15 +57,27 @@ Keep it that way; two-dimensional editing is not worth the complexity.
 **DEL and the arrows move by token, not character.** `prevBoundary` /
 `nextBoundary` in `lib/math/lexer.ts` do this, so `sin(` disappears in one press.
 
-**Values are `number | number[] | Matrix`.** `map1`/`map2` in `eval.ts` handle
-all three, so element-wise operations work on matrices for free. Matrix × matrix
-is the real product and is special-cased; division by a matrix is a data-type
-error rather than an inverse.
+**Values are `number | number[] | Matrix | Complex`.** `map1`/`map2` in
+`eval.ts` handle the real cases, so element-wise operations work on matrices for
+free. Matrix × matrix is the real product and is special-cased; division by a
+matrix is a data-type error rather than an inverse.
+
+**Complex is off the fast path on purpose.** Plain numbers stay plain numbers —
+plotting samples a curve thousands of times and must not allocate. A `Complex`
+appears only when the user writes `i` or an operation leaves the reals *and*
+`env.complex === "a+bi"`. Complex never combines with a list or a matrix;
+`complexPair` enforces that. Results collapse back to a real when the imaginary
+part is rounding noise.
 
 **The program interpreter suspends, it does not block.** `run()` returns a
 status; the store supplies input and calls `run()` again. The live `Interpreter`
 lives in a closure variable in the store, not in reactive state — putting it in
 state would clone it on every set.
+
+**Sequences are evaluated forwards and cached.** `buildSequences` registers all
+three term functions before any of them runs, so a definition can reference
+itself or the others. Each term walks from nMin filling a cache, which is what
+keeps a recursive definition linear instead of exponential.
 
 **Graph modes reinterpret the same six Y slots.** `lib/calc/curves.ts` turns
 them into parameterised curves; the plotter, trace and ZoomFit all consume that
@@ -123,6 +135,11 @@ thresholded, then blown up. Three consequences worth knowing before touching it:
 A screen renderer returns hit regions so taps can still select rows — the panel
 has no DOM, so that is the only pointer affordance.
 
+`Pen` also records every string it draws. `pen.transcript()` turns that into
+reading-order lines, which `Screen.tsx` mirrors into a live region — the only
+thing a screen reader has to go on, since a canvas exposes nothing. Draw text
+through `Pen`, never straight to the context, or it vanishes from that mirror.
+
 ## CSS
 
 One stylesheet, `app/globals.css`, in plain CSS with custom properties. Tailwind
@@ -158,5 +175,5 @@ Note that a key's accessible name follows the armed modifier: after pressing
 
 ## Scope
 
-No complex-number mode; it would touch every numeric path. No sequence
-graphing, finance solver or APPS. `CALC` is function-mode only and says so.
+No finance solver or APPS. `CALC` is function-mode only and says so. Complex
+values stay out of lists and matrices.

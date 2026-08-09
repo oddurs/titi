@@ -6,6 +6,7 @@ import type { GraphWindow, Modes, YFunction } from "../lib/calc/types";
 const win: GraphWindow = {
   xmin: -10, xmax: 10, xscl: 1, ymin: -10, ymax: 10, yscl: 1, xres: 1,
   tmin: 0, tmax: 2 * Math.PI, tstep: Math.PI / 48,
+  nmin: 1, nmax: 10,
 };
 
 const slot = (expr: string, on = true): YFunction => ({
@@ -96,5 +97,58 @@ describe("parameter ranges");
 eq("function mode spans the x window", paramRange("func", win).min, -10);
 eq("polar mode spans the parameter window", paramRange("pol", win).max, 2 * Math.PI);
 near("parametric step follows Tstep", paramRange("par", win).step, Math.PI / 48);
+
+describe("sequence mode");
+{
+  const env = makeEnv();
+  env.vars.nMin = 1;
+  // u(n) = n² is not recursive
+  const cs = buildCurves([slot("n²"), slot(""), slot("")], modes("seq"), env);
+  eq("one sequence", cs.length, 1);
+  eq("labelled u", cs[0].label, "u");
+  near("u(1)", cs[0].at(1).y, 1);
+  near("u(4)", cs[0].at(4).y, 16);
+  near("x is the index", cs[0].at(4).x, 4);
+}
+{
+  // Fibonacci: u(n) = u(n-1) + u(n-2), seeded 1,1
+  const env = makeEnv();
+  env.vars.nMin = 1;
+  const cs = buildCurves(
+    [slot("u(n-1)+u(n-2)"), slot(""), slot(""), slot("{1,1}"), slot(""), slot("")],
+    modes("seq"),
+    env,
+  );
+  eq("recursive sequence builds", cs.length, 1);
+  // Seeded {1,1} at nMin=1 means u(0)=u(-1)=1, so u(1)=2 and the run is
+  // 2,3,5,8,13,... — the Fibonacci numbers shifted one place.
+  near("u(1)", cs[0].at(1).y, 2);
+  near("u(5)", cs[0].at(5).y, 13);
+  near("u(10)", cs[0].at(10).y, 144);
+}
+{
+  // A sequence may reference another one.
+  const env = makeEnv();
+  env.vars.nMin = 1;
+  const cs = buildCurves(
+    [slot("n"), slot("2u(n)"), slot("")],
+    modes("seq"),
+    env,
+  );
+  eq("two sequences", cs.length, 2);
+  near("u(3)", cs[0].at(3).y, 3);
+  near("v(3) doubles u(3)", cs[1].at(3).y, 6);
+}
+{
+  const env = makeEnv();
+  env.vars.nMin = 1;
+  eq(
+    "seq slots are labelled u, v, w and their seeds",
+    slotLabels("seq"),
+    ["u", "v", "w", "u(nMin)", "v(nMin)", "w(nMin)"],
+  );
+  eq("n is the sequence parameter", paramVar("seq"), "n");
+  eq("n steps by one", paramRange("seq", win).step, 1);
+}
 
 reportIfMain(import.meta.url);

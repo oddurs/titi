@@ -19,6 +19,7 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
           ins("nDeriv(", "nDeriv(", "numeric derivative"),
           ins("fnInt(", "fnInt(", "definite integral"),
           ins("solve(", "solve(", "root near a guess"),
+          act("Solver...", "screen:solver", "solve an equation for any variable"),
         ],
       },
       {

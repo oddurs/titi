@@ -50,7 +50,8 @@ export const KEY_ROWS: (KeyDef | null)[][] = [
   ],
   [
     { id: "alpha", label: "alpha", second: "A‑lock", role: "modalpha", act: "mod:alpha", act2: "mod:alphalock" },
-    { id: "xtn", label: "X,T,θ,n", second: "link", role: "control", ins: "X", act2: "noop" },
+    // Inserts whichever variable the current graph mode is written in.
+    { id: "xtn", label: "X,T,θ,n", second: "link", role: "control", act: "xtn", act2: "noop" },
     { id: "stat", label: "stat", second: "list", role: "control", act: "menu:stat", act2: "menu:list" },
     null,
     null,
@@ -78,9 +79,9 @@ export const KEY_ROWS: (KeyDef | null)[][] = [
   ],
   [
     { id: "log", label: "log", second: "10ˣ", alpha: "N", role: "fn", ins: "log(", ins2: "10^(" },
-    { id: "d7", label: "7", second: "u", alpha: "O", role: "digit", ins: "7" },
-    { id: "d8", label: "8", second: "v", alpha: "P", role: "digit", ins: "8" },
-    { id: "d9", label: "9", second: "w", alpha: "Q", role: "digit", ins: "9" },
+    { id: "d7", label: "7", second: "u", alpha: "O", role: "digit", ins: "7", ins2: "u(" },
+    { id: "d8", label: "8", second: "v", alpha: "P", role: "digit", ins: "8", ins2: "v(" },
+    { id: "d9", label: "9", second: "w", alpha: "Q", role: "digit", ins: "9", ins2: "w(" },
     { id: "mul", label: "×", second: "[", alpha: "R", role: "op", ins: "×", ins2: "[" },
   ],
   [
@@ -100,7 +101,7 @@ export const KEY_ROWS: (KeyDef | null)[][] = [
   [
     { id: "on", label: "on", second: "off", role: "control", act: "reset" },
     { id: "d0", label: "0", second: "catalog", alpha: "␣", role: "digit", ins: "0", act2: "menu:catalog" },
-    { id: "dot", label: ".", second: "i", alpha: ":", role: "digit", ins: "." },
+    { id: "dot", label: ".", second: "i", alpha: ":", role: "digit", ins: ".", ins2: "i" },
     { id: "neg", label: "(−)", second: "ans", alpha: "?", role: "digit", ins: "-", ins2: "Ans" },
     { id: "enter", label: "enter", second: "entry", alpha: "solve", role: "enter", act: "enter", act2: "lastEntry" },
   ],

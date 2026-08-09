@@ -17,7 +17,7 @@ import {
   twoVarStats,
   type StatReport,
 } from "../math/stats";
-import { buildCurves, paramRange } from "./curves";
+import { buildCurves, paramRange, paramVar } from "./curves";
 import {
   findExtremum,
   findIntersection,
@@ -28,6 +28,7 @@ import {
   MODE_ROWS,
   WINDOW_FIELDS,
   WINDOW_LABELS,
+  solverRows,
   visibleWindowFields,
   windowLabel,
   type ModeOption,
@@ -35,6 +36,7 @@ import {
 } from "./layout";
 import * as MX from "../math/matrix";
 import type { Matrix } from "../math/matrix";
+import { equationVariables, solveEquation } from "../math/solver";
 import {
   Interpreter,
   SAMPLE_PROGRAMS,
@@ -53,6 +55,7 @@ import type {
   StatPlot,
   TableSetup,
   PrgmRun,
+  SolverState,
   TraceState,
   YFunction,
 } from "./types";
@@ -62,6 +65,7 @@ export { PLOT_COLORS } from "./colors";
 const Y_NAMES = ["Y₁", "Y₂", "Y₃", "Y₄", "Y₅", "Y₆"];
 const LIST_NAMES = ["L₁", "L₂", "L₃", "L₄", "L₅", "L₆"];
 export {
+  solverRows,
   MODE_ROWS,
   WINDOW_FIELDS,
   WINDOW_LABELS,
@@ -77,11 +81,13 @@ const STANDARD_WINDOW: GraphWindow = {
   ymin: -10, ymax: 10, yscl: 1,
   xres: 1,
   tmin: 0, tmax: 2 * Math.PI, tstep: Math.PI / 48,
+  nmin: 1, nmax: 10,
 };
 
 const DEFAULT_MODES: Modes = {
   graphMode: "func",
   angle: "rad",
+  complex: "real",
   notation: "normal",
   decimals: -1,
   connected: true,
@@ -141,6 +147,7 @@ export interface CalcState {
   /** the program being edited, held as lines */
   prgmLines: string[];
   prgmName: string;
+  solver: SolverState;
   /** row cursor for the list-style screens */
   row: number;
   col: number;
@@ -186,6 +193,9 @@ export const useCalc = create<CalcState>((set, get) => {
   function syncEnv(s: Partial<CalcState> = {}) {
     const st = { ...get(), ...s };
     env.angle = st.modes.angle;
+    env.complex = st.modes.complex;
+    env.vars.nMin = st.win.nmin;
+    env.vars.nMax = st.win.nmax;
     env.ys = Object.fromEntries(
       st.ys.filter((y) => y.expr.trim()).map((y) => [y.name, y.expr]),
     );
@@ -206,6 +216,7 @@ export const useCalc = create<CalcState>((set, get) => {
         ys, win, modes, tbl, lists, plots,
         mats: get().mats,
         programs: get().programs,
+        solver: get().solver,
         history: history.slice(-30),
       }),
       );
@@ -336,6 +347,10 @@ export const useCalc = create<CalcState>((set, get) => {
       }
     } else if (target.kind === "prgm") {
       text = st.prgmLines[target.line] ?? "";
+    } else if (target.kind === "solver") {
+      const rows = solverRows(st.solver);
+      const row = rows[target.row];
+      text = row ? row.value : "";
     }
     const replaceOnType =
       target.kind === "window" ||
@@ -373,6 +388,7 @@ export const useCalc = create<CalcState>((set, get) => {
       const field = visibleWindowFields(st.modes.graphMode)[t.row];
       const win = { ...st.win, [field]: field === "xres" ? clamp(Math.round(v), 1, 8) : v };
       set({ win, marks: [], revision: st.revision + 1 });
+      syncEnv({ win });
       persist();
       return;
     }
@@ -417,6 +433,48 @@ export const useCalc = create<CalcState>((set, get) => {
         p.name === st.prgmName ? { ...p, body: lines.join("\n") } : p,
       );
       set({ prgmLines: lines, programs });
+      persist();
+      return;
+    }
+
+    if (t.kind === "solver") {
+      const rows = solverRows(st.solver);
+      const row = rows[t.row];
+      if (!row) return;
+      if (row.kind === "equation") {
+        const equation = st.entry.text.trim();
+        // Keep any values the user already typed for variables that survive.
+        const vars = equationVariables(equation);
+        const values: Record<string, number> = {};
+        for (const v of vars) values[v] = st.solver.values[v] ?? 0;
+        set({
+          solver: {
+            ...st.solver,
+            equation,
+            values,
+            target: vars.includes(st.solver.target) ? st.solver.target : (vars[0] ?? ""),
+            residual: null,
+          },
+        });
+        persist();
+        return;
+      }
+      const v = numberFromEntry();
+      if (v === undefined) return;
+      if (v === null) return note("ERR: INVALID");
+      if (row.kind === "var") {
+        set({
+          solver: {
+            ...st.solver,
+            values: { ...st.solver.values, [row.name!]: v },
+            residual: null,
+          },
+        });
+      } else {
+        const bound: [number, number] = [...st.solver.bound];
+        bound[row.kind === "lower" ? 0 : 1] = v;
+        set({ solver: { ...st.solver, bound, residual: null } });
+      }
       persist();
       return;
     }
@@ -469,6 +527,9 @@ export const useCalc = create<CalcState>((set, get) => {
     } else if (t.kind === "prgm") {
       const line = clamp(t.line + delta, 0, Math.max(0, st.prgmLines.length - 1));
       loadEditTarget({ kind: "prgm", line });
+    } else if (t.kind === "solver") {
+      const count = solverRows(get().solver).length;
+      loadEditTarget({ kind: "solver", row: clamp(t.row + delta, 0, count - 1) });
     }
   }
 
@@ -542,6 +603,9 @@ export const useCalc = create<CalcState>((set, get) => {
       }
       set({ screen, menu: null });
       loadEditTarget({ kind: "matrix", name, row: 0, col: 0 });
+    } else if (screen === "solver") {
+      set({ screen, menu: null, row: 0 });
+      loadEditTarget({ kind: "solver", row: 0 });
     } else if (screen === "prgm") {
       set({ screen, menu: null });
       loadEditTarget({ kind: "prgm", line: 0 });
@@ -655,7 +719,9 @@ export const useCalc = create<CalcState>((set, get) => {
           }
         }
         if (!Number.isFinite(yLo) || yLo === yHi) {
-          note("ERR: NO FUNCTIONS");
+          // The slots are filled but nothing sampled — an undefined sequence
+          // seed is the usual reason, and it is worth saying so.
+          note("ERR: NOTHING TO FIT");
           set({ menu: null });
           break;
         }
@@ -938,6 +1004,41 @@ export const useCalc = create<CalcState>((set, get) => {
     });
     syncEnv({ modes });
     persist();
+  }
+
+  /** Solve the equation for one variable and write the answer back into it. */
+  function runSolve(target: string) {
+    const st = get();
+    const { equation, values, bound } = st.solver;
+    if (!equation.trim()) return note("ERR: NO EQUATION");
+    syncEnv();
+    const known: Record<string, number> = {};
+    for (const [k, v] of Object.entries(values)) {
+      if (k !== target) known[k] = v;
+    }
+    try {
+      const { value, residual } = solveEquation(
+        { equation, target, known, guess: values[target] ?? 0, bound },
+        env,
+      );
+      set({
+        solver: {
+          ...st.solver,
+          target,
+          values: { ...values, [target]: value },
+          residual,
+        },
+        message: null,
+      });
+      // show the answer in the row that was just solved
+      const at = solverRows(get().solver).findIndex(
+        (r) => r.kind === "var" && r.name === target,
+      );
+      if (at >= 0) loadEditTarget({ kind: "solver", row: at });
+      persist();
+    } catch (e) {
+      note(e instanceof CalcError ? e.message : "ERR: SYNTAX");
+    }
   }
 
   // -- programs ---------------------------------------------------------------
@@ -1282,6 +1383,14 @@ export const useCalc = create<CalcState>((set, get) => {
           set({ prgmRun: null });
           return gotoScreen("home");
         }
+        if (st.target.kind === "solver") {
+          commitTarget();
+          const rows = solverRows(get().solver);
+          const row = rows[st.target.row];
+          if (row?.kind === "var" && row.name) runSolve(row.name);
+          else moveRow(1);
+          return;
+        }
         if (st.target.kind === "prgm") {
           // ENTER opens a new line below, the way the program editor works
           commitTarget();
@@ -1399,6 +1508,10 @@ export const useCalc = create<CalcState>((set, get) => {
         persist();
         return;
 
+      case "xtn":
+        insert(paramVar(st.modes.graphMode));
+        return;
+
       case "noop":
         return;
     }
@@ -1426,6 +1539,13 @@ export const useCalc = create<CalcState>((set, get) => {
     prgmRun: null,
     prgmLines: [],
     prgmName: "",
+    solver: {
+      equation: "",
+      values: {},
+      target: "",
+      bound: [-1e5, 1e5],
+      residual: null,
+    },
     row: 0,
     col: 0,
     cursor: null,
@@ -1520,6 +1640,7 @@ export const useCalc = create<CalcState>((set, get) => {
             programs: saved.programs?.length
               ? saved.programs
               : SAMPLE_PROGRAMS.map((p) => ({ ...p })),
+            solver: saved.solver ?? get().solver,
             history: saved.history ?? [],
           });
         }

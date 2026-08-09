@@ -111,7 +111,7 @@ thresholded, then blown up. Three consequences worth knowing before touching it:
 - **Draw on integers.** `Pen` plots lines with Bresenham rather than stroking,
   so nothing relies on the threshold to look straight.
 - **Text comes from a character ROM, not a font.** `lib/display/glyphs.ts` holds
-  every glyph as a 5×7 bitmap in a 6×8 cell. Rasterising a pixel font and
+  every glyph as a 5×7 bitmap in a 6×9 cell. Rasterising a pixel font and
   thresholding it looked close but never landed — a stem falling between two
   dots either doubles or vanishes, which is what made round glyphs like 6 and 8
   malformed. Add a symbol to the table, not to the font stack. Subscripts fold

@@ -6,7 +6,8 @@
  * vanishes, which is why round glyphs like 6 and 8 came out malformed. A real
  * device has no rasteriser in the loop — it has a table — so this is a table.
  *
- * 5 wide by 7 tall, in a 6×8 cell, the same geometry the TI-84 uses.
+ * 5 wide by 7 tall, in a 6×9 cell — the TI-84 geometry plus a row of
+ * leading, without which dense screens like TABLE run together.
  * '#' is a lit dot.
  */
 

@@ -1,0 +1,258 @@
+import { lex, type Token } from "./lexer";
+import { ParseError, type Node } from "./ast";
+
+/**
+ * Precedence-climbing parser for TI linear syntax.
+ *
+ * Notable device behaviours reproduced here:
+ *  - negation binds looser than `^`, so -2^2 is -4
+ *  - implicit multiplication shares precedence with `*`, so 1/2X is (1/2)X
+ *  - closing parens are optional at end of input ("sin(X" parses)
+ */
+
+const ARITY: Record<string, [number, number]> = {
+  sin: [1, 1], cos: [1, 1], tan: [1, 1],
+  asin: [1, 1], acos: [1, 1], atan: [1, 1],
+  sinh: [1, 1], cosh: [1, 1], tanh: [1, 1],
+  asinh: [1, 1], acosh: [1, 1], atanh: [1, 1],
+  log: [1, 2], ln: [1, 1], sqrt: [1, 1], cbrt: [1, 1], xroot: [2, 2],
+  abs: [1, 1], round: [1, 2], iPart: [1, 1], fPart: [1, 1], int: [1, 1],
+  max: [1, 2], min: [1, 2], lcm: [2, 2], gcd: [2, 2],
+  nDeriv: [3, 4], fnInt: [4, 5], sum: [1, 3], seq: [4, 5],
+  mean: [1, 2], median: [1, 2], stdDev: [1, 2], variance: [1, 2],
+  randInt: [2, 3], pow10: [1, 1], expe: [1, 1], conj: [1, 1],
+  normalpdf: [1, 3], normalcdf: [2, 4], invNorm: [1, 3],
+  binompdf: [2, 3], binomcdf: [2, 3], solve: [2, 4],
+};
+
+const COMPARE = new Set(["=", "≠", "<", ">", "≤", "≥"]);
+
+class Parser {
+  private i = 0;
+  constructor(private toks: Token[], private src: string) {}
+
+  private peek(): Token | undefined {
+    return this.toks[this.i];
+  }
+  private at(kind: string, value?: string): boolean {
+    const t = this.peek();
+    return !!t && t.kind === kind && (value === undefined || t.value === value);
+  }
+  private next(): Token {
+    const t = this.toks[this.i];
+    if (!t) throw new ParseError("ERR: SYNTAX", this.src.length);
+    this.i += 1;
+    return t;
+  }
+  private eat(kind: string, value?: string): boolean {
+    if (this.at(kind, value)) {
+      this.i += 1;
+      return true;
+    }
+    return false;
+  }
+  private here(): number {
+    return this.peek()?.start ?? this.src.length;
+  }
+
+  parse(): Node {
+    if (this.toks.length === 0) throw new ParseError("ERR: SYNTAX", 0);
+    const e = this.parseStore();
+    if (this.i < this.toks.length) {
+      throw new ParseError("ERR: SYNTAX", this.here());
+    }
+    return e;
+  }
+
+  private parseStore(): Node {
+    const e = this.parseCompare();
+    if (this.at("store")) {
+      this.next();
+      const t = this.peek();
+      if (!t || (t.kind !== "var" && t.kind !== "list" && t.kind !== "yref")) {
+        throw new ParseError("ERR: SYNTAX", this.here());
+      }
+      this.next();
+      return { t: "store", e, target: t.value };
+    }
+    return e;
+  }
+
+  private parseCompare(): Node {
+    let l = this.parseSum();
+    while (this.peek() && this.peek()!.kind === "op" && COMPARE.has(this.peek()!.value)) {
+      const op = this.next().value;
+      l = { t: "bin", op, l, r: this.parseSum() };
+    }
+    return l;
+  }
+
+  private parseSum(): Node {
+    let l = this.parseProduct();
+    for (;;) {
+      if (this.at("op", "+")) {
+        this.next();
+        l = { t: "bin", op: "+", l, r: this.parseProduct() };
+      } else if (this.at("op", "-")) {
+        this.next();
+        l = { t: "bin", op: "-", l, r: this.parseProduct() };
+      } else return l;
+    }
+  }
+
+  private parseProduct(): Node {
+    let l = this.parseUnary();
+    for (;;) {
+      if (this.at("op", "*")) {
+        this.next();
+        l = { t: "bin", op: "*", l, r: this.parseUnary() };
+      } else if (this.at("op", "/")) {
+        this.next();
+        l = { t: "bin", op: "/", l, r: this.parseUnary() };
+      } else if (this.startsImplicitFactor()) {
+        l = { t: "bin", op: "*", l, r: this.parseUnary(), implicit: true };
+      } else return l;
+    }
+  }
+
+  /** A value-starting token directly after a value means juxtaposition: 2π, 3sin(X), (X+1)(X-1). */
+  private startsImplicitFactor(): boolean {
+    const t = this.peek();
+    if (!t) return false;
+    return (
+      t.kind === "num" ||
+      t.kind === "var" ||
+      t.kind === "fn" ||
+      t.kind === "const" ||
+      t.kind === "list" ||
+      t.kind === "yref" ||
+      t.kind === "lparen"
+    );
+  }
+
+  private parseUnary(): Node {
+    if (this.at("op", "-")) {
+      this.next();
+      return { t: "neg", e: this.parseUnary() };
+    }
+    return this.parsePower();
+  }
+
+  private parsePower(): Node {
+    const base = this.parsePostfix();
+    if (this.at("op", "^")) {
+      this.next();
+      // right-associative, and the exponent may be negated: 2^-3
+      return { t: "bin", op: "^", l: base, r: this.parseUnary() };
+    }
+    return base;
+  }
+
+  private parsePostfix(): Node {
+    let e = this.parsePrimary();
+    // Y₁(3) applies the stored function rather than multiplying by it.
+    if (e.t === "yref" && this.at("lparen")) {
+      this.next();
+      const arg = this.parseSum();
+      this.closeParen();
+      e = { t: "call", name: "@y", args: [{ t: "yref", name: e.name }, arg] };
+    }
+    for (;;) {
+      const t = this.peek();
+      if (t && t.kind === "postfix") {
+        this.next();
+        e = { t: "post", op: t.value, e };
+      } else if (t && t.kind === "fn" && t.value === "xroot") {
+        // ˣ√( — index precedes the radical: 3ˣ√(8)
+        this.next();
+        const arg = this.parseSum();
+        this.closeParen();
+        e = { t: "call", name: "xroot", args: [e, arg] };
+      } else return e;
+    }
+  }
+
+  private closeParen() {
+    // Trailing parens are optional, matching the device's forgiving ENTER.
+    if (!this.eat("rparen") && this.i < this.toks.length) {
+      throw new ParseError("ERR: SYNTAX", this.here());
+    }
+  }
+
+  private parsePrimary(): Node {
+    const t = this.peek();
+    if (!t) throw new ParseError("ERR: SYNTAX", this.src.length);
+
+    if (t.kind === "num") {
+      this.next();
+      const v = Number(t.value);
+      if (!Number.isFinite(v) && t.value !== "Infinity") {
+        throw new ParseError("ERR: SYNTAX", t.start);
+      }
+      return { t: "num", v, raw: t.text };
+    }
+
+    if (t.kind === "const") {
+      this.next();
+      return { t: "const", name: t.value };
+    }
+    if (t.kind === "var") {
+      this.next();
+      return { t: "var", name: t.value };
+    }
+    if (t.kind === "list") {
+      this.next();
+      return { t: "list", name: t.value };
+    }
+    if (t.kind === "yref") {
+      this.next();
+      return { t: "yref", name: t.value };
+    }
+
+    if (t.kind === "fn") {
+      this.next();
+      const args: Node[] = [];
+      if (!this.at("rparen") && this.i < this.toks.length) {
+        args.push(this.parseSum());
+        while (this.eat("comma")) args.push(this.parseSum());
+      }
+      this.closeParen();
+      const range = ARITY[t.value];
+      if (range && (args.length < range[0] || args.length > range[1])) {
+        throw new ParseError("ERR: ARGUMENT", t.start);
+      }
+      if (!range) throw new ParseError("ERR: UNDEFINED", t.start);
+      return { t: "call", name: t.value, args };
+    }
+
+    if (t.kind === "lparen") {
+      this.next();
+      if (t.text === "{") {
+        const items: Node[] = [];
+        if (!this.at("rparen")) {
+          items.push(this.parseSum());
+          while (this.eat("comma")) items.push(this.parseSum());
+        }
+        this.eat("rparen");
+        return { t: "listlit", items };
+      }
+      const inner = this.parseCompare();
+      this.closeParen();
+      return inner;
+    }
+
+    throw new ParseError("ERR: SYNTAX", t.start);
+  }
+}
+
+export function parse(src: string): Node {
+  return new Parser(lex(src), src).parse();
+}
+
+export function tryParse(src: string): Node | null {
+  try {
+    return parse(src);
+  } catch {
+    return null;
+  }
+}

@@ -1,0 +1,133 @@
+export type KeyRole =
+  | "mod2nd"
+  | "modalpha"
+  | "soft"
+  | "control"
+  | "fn"
+  | "digit"
+  | "op"
+  | "enter";
+
+export interface KeyDef {
+  id: string;
+  /** face label */
+  label: string;
+  /** blue label printed above-left */
+  second?: string;
+  /** green label printed above-right */
+  alpha?: string;
+  role: KeyRole;
+  /** text inserted at the caret on a plain press */
+  ins?: string;
+  /** text inserted when 2nd is active */
+  ins2?: string;
+  /** named action on a plain press (takes precedence over ins) */
+  act?: string;
+  /** named action when 2nd is active */
+  act2?: string;
+  /** text inserted when alpha is active; defaults to the alpha label */
+  insA?: string;
+}
+
+/**
+ * The TI-84 Plus faceplate, row by row. Rows 2–3 leave columns 4–5 empty —
+ * the arrow cluster is rendered over that gap.
+ */
+export const KEY_ROWS: (KeyDef | null)[][] = [
+  [
+    { id: "yeq", label: "y=", second: "stat plot", role: "soft", act: "screen:yeq", act2: "menu:statplot" },
+    { id: "window", label: "window", second: "tblset", role: "soft", act: "screen:window", act2: "screen:tblset" },
+    { id: "zoom", label: "zoom", second: "format", role: "soft", act: "menu:zoom", act2: "screen:format" },
+    { id: "trace", label: "trace", second: "calc", role: "soft", act: "trace", act2: "menu:calc" },
+    { id: "graph", label: "graph", second: "table", role: "soft", act: "screen:graph", act2: "screen:table" },
+  ],
+  [
+    { id: "2nd", label: "2nd", role: "mod2nd", act: "mod:2nd" },
+    { id: "mode", label: "mode", second: "quit", role: "control", act: "screen:mode", act2: "quit" },
+    { id: "del", label: "del", second: "ins", role: "control", act: "del", act2: "insertMode" },
+    null,
+    null,
+  ],
+  [
+    { id: "alpha", label: "alpha", second: "A‑lock", role: "modalpha", act: "mod:alpha", act2: "mod:alphalock" },
+    { id: "xtn", label: "X,T,θ,n", second: "link", role: "control", ins: "X", act2: "noop" },
+    { id: "stat", label: "stat", second: "list", role: "control", act: "menu:stat", act2: "menu:list" },
+    null,
+    null,
+  ],
+  [
+    { id: "math", label: "math", second: "test", alpha: "A", role: "control", act: "menu:math", act2: "menu:test" },
+    { id: "apps", label: "apps", second: "angle", alpha: "B", role: "control", act: "menu:apps", act2: "menu:angle" },
+    { id: "prgm", label: "prgm", second: "draw", alpha: "C", role: "control", act: "menu:prgm", act2: "menu:draw" },
+    { id: "vars", label: "vars", second: "distr", role: "control", act: "menu:vars", act2: "menu:distr" },
+    { id: "clear", label: "clear", role: "control", act: "clear" },
+  ],
+  [
+    { id: "inv", label: "x⁻¹", second: "matrix", alpha: "D", role: "fn", ins: "⁻¹", act2: "menu:matrix" },
+    { id: "sin", label: "sin", second: "sin⁻¹", alpha: "E", role: "fn", ins: "sin(", ins2: "sin⁻¹(" },
+    { id: "cos", label: "cos", second: "cos⁻¹", alpha: "F", role: "fn", ins: "cos(", ins2: "cos⁻¹(" },
+    { id: "tan", label: "tan", second: "tan⁻¹", alpha: "G", role: "fn", ins: "tan(", ins2: "tan⁻¹(" },
+    { id: "pow", label: "^", second: "π", alpha: "H", role: "op", ins: "^", ins2: "π" },
+  ],
+  [
+    { id: "sq", label: "x²", second: "√", alpha: "I", role: "fn", ins: "²", ins2: "√(" },
+    { id: "comma", label: ",", second: "ᴇ", alpha: "J", role: "op", ins: ",", ins2: "ᴇ" },
+    { id: "lparen", label: "(", second: "{", alpha: "K", role: "op", ins: "(", ins2: "{" },
+    { id: "rparen", label: ")", second: "}", alpha: "L", role: "op", ins: ")", ins2: "}" },
+    { id: "div", label: "÷", second: "ℯ", alpha: "M", role: "op", ins: "÷", ins2: "ℯ" },
+  ],
+  [
+    { id: "log", label: "log", second: "10ˣ", alpha: "N", role: "fn", ins: "log(", ins2: "10^(" },
+    { id: "d7", label: "7", second: "u", alpha: "O", role: "digit", ins: "7" },
+    { id: "d8", label: "8", second: "v", alpha: "P", role: "digit", ins: "8" },
+    { id: "d9", label: "9", second: "w", alpha: "Q", role: "digit", ins: "9" },
+    { id: "mul", label: "×", second: "[", alpha: "R", role: "op", ins: "×", ins2: "[" },
+  ],
+  [
+    { id: "ln", label: "ln", second: "ℯˣ", alpha: "S", role: "fn", ins: "ln(", ins2: "ℯ^(" },
+    { id: "d4", label: "4", second: "L₄", alpha: "T", role: "digit", ins: "4", ins2: "L₄" },
+    { id: "d5", label: "5", second: "L₅", alpha: "U", role: "digit", ins: "5", ins2: "L₅" },
+    { id: "d6", label: "6", second: "L₆", alpha: "V", role: "digit", ins: "6", ins2: "L₆" },
+    { id: "sub", label: "−", second: "]", alpha: "W", role: "op", ins: "−", ins2: "]" },
+  ],
+  [
+    { id: "sto", label: "sto▸", second: "rcl", alpha: "X", role: "control", ins: "→", act2: "recall" },
+    { id: "d1", label: "1", second: "L₁", alpha: "Y", role: "digit", ins: "1", ins2: "L₁" },
+    { id: "d2", label: "2", second: "L₂", alpha: "Z", role: "digit", ins: "2", ins2: "L₂" },
+    { id: "d3", label: "3", second: "L₃", alpha: "θ", role: "digit", ins: "3", ins2: "L₃" },
+    { id: "add", label: "+", second: "mem", alpha: '"', role: "op", ins: "+", act2: "menu:mem" },
+  ],
+  [
+    { id: "on", label: "on", second: "off", role: "control", act: "reset" },
+    { id: "d0", label: "0", second: "catalog", alpha: "␣", role: "digit", ins: "0", act2: "menu:catalog" },
+    { id: "dot", label: ".", second: "i", alpha: ":", role: "digit", ins: "." },
+    { id: "neg", label: "(−)", second: "ans", alpha: "?", role: "digit", ins: "-", ins2: "Ans" },
+    { id: "enter", label: "enter", second: "entry", alpha: "solve", role: "enter", act: "enter", act2: "lastEntry" },
+  ],
+];
+
+export const ALL_KEYS: KeyDef[] = KEY_ROWS.flat().filter(
+  (k): k is KeyDef => k !== null,
+);
+
+export const ARROW_KEYS: KeyDef[] = [
+  { id: "up", label: "▲", role: "control", act: "up" },
+  { id: "left", label: "◀", role: "control", act: "left" },
+  { id: "right", label: "▶", role: "control", act: "right" },
+  { id: "down", label: "▼", role: "control", act: "down" },
+];
+
+const BY_ID = new Map<string, KeyDef>(
+  [...ALL_KEYS, ...ARROW_KEYS].map((k) => [k.id, k]),
+);
+export const keyById = (id: string) => BY_ID.get(id);
+
+/** Physical keyboard → device key. Typing on a laptop should just work. */
+export const KEYBOARD_MAP: Record<string, string> = {
+  "0": "d0", "1": "d1", "2": "d2", "3": "d3", "4": "d4",
+  "5": "d5", "6": "d6", "7": "d7", "8": "d8", "9": "d9",
+  ".": "dot", "+": "add", "-": "sub", "*": "mul", "/": "div",
+  "^": "pow", "(": "lparen", ")": "rparen", ",": "comma",
+  Enter: "enter", Backspace: "del", Delete: "del", Escape: "quit",
+  ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
+};

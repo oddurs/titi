@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DotPanel } from "@/lib/display/panel";
 import { CHAR_H, Pen } from "@/lib/display/pen";
-import { renderScreen, type HitRegion } from "@/lib/display/screens";
+import { renderFailure, renderScreen, type HitRegion } from "@/lib/display/screens";
 import { useCalc } from "@/lib/calc/store";
 import type { GraphWindow } from "@/lib/calc/types";
 
@@ -75,7 +75,17 @@ export default function Screen() {
 
     panel.begin();
     const pen = new Pen(panel.ctx, m.cols, m.rows, fontStack);
-    hitsRef.current = renderScreen(pen, state);
+    try {
+      hitsRef.current = renderScreen(pen, state);
+    } catch (e) {
+      // One bad frame must not leave the glass blank with no way back.
+      panel.begin();
+      hitsRef.current = [];
+      renderFailure(
+        new Pen(panel.ctx, m.cols, m.rows, fontStack),
+        e instanceof Error ? e.message : String(e),
+      );
+    }
     panel.present(target);
     setTranscript(pen.transcript());
   }, [size, state, fontStack]);

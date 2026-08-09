@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, IBM_Plex_Mono } from "next/font/google";
+import { Barlow } from "next/font/google";
 import "./globals.css";
 
 /**
@@ -11,17 +11,13 @@ import "./globals.css";
  * sit on a keycap without shrinking.
  *
  * The display has no typeface at all: it draws from a 5×7 character ROM in
- * lib/display/glyphs.ts, the way the device it is modelled on does. IBM Plex
- * Mono stays as the panel's fallback for any glyph the ROM lacks.
+ * lib/display/glyphs.ts, the way the device it is modelled on does. It once
+ * carried a webfont as the panel's fallback, which was a download for glyphs
+ * the ROM already has — scripts/glyphs.test.ts proves the coverage — so the
+ * small amount of monospace chrome now takes the system face instead.
  */
 const ui = Barlow({
   variable: "--font-ui",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const mono = IBM_Plex_Mono({
-  variable: "--font-mono",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
 });
@@ -45,7 +41,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${ui.variable} ${mono.variable}`}>
+      <body className={ui.variable}>
         {children}
       </body>
     </html>

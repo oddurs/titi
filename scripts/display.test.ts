@@ -1,7 +1,8 @@
 import { describe, eq, ok, reportIfMain } from "./harness";
 import { device } from "./device";
 import { renderPanel, shows } from "./panel";
-import { CHAR_H } from "../lib/display/pen";
+import { CHAR_H, Pen } from "../lib/display/pen";
+import { renderFailure } from "../lib/display/screens";
 
 /**
  * What the panel actually draws.
@@ -168,6 +169,22 @@ describe("the panel never falls back to a font");
   const stats = device().press("stat").press("enter").type("2").press("enter")
     .type("4").press("enter").press("stat").press("right").press("enter");
   ok("so do the statistics, x-bar and all", renderPanel(stats.get()).count() > 0);
+}
+
+describe("a failing screen still says something");
+{
+  const ctx = {
+    fillStyle: "", font: "", textBaseline: "", textAlign: "",
+    globalCompositeOperation: "source-over",
+    save() {}, restore() {},
+    fillRect() {}, fillText() {},
+  };
+  const pen = new Pen(ctx as unknown as CanvasRenderingContext2D, 176, 190, "8px monospace");
+  renderFailure(pen, "Cannot read properties of undefined (reading 'expr')");
+  const lines = pen.transcript();
+  ok("names itself an error", lines[0] === "ERROR");
+  ok("reports what happened", lines.join(" ").includes("undefined"));
+  ok("and how to get out", lines.join(" ").includes("PRESS ON TO RESET"));
 }
 
 reportIfMain(import.meta.url);

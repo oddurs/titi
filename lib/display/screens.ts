@@ -65,6 +65,35 @@ function chrome(pen: Pen, s: CalcState): number {
 /** Dot row → text row, for content that starts below the chrome. */
 const rowAt = (top: number, i: number) => top + i * CHAR_H;
 
+/**
+ * Draw a failure on the panel itself.
+ *
+ * A screen that throws would otherwise leave the glass blank with no way back,
+ * so the device reports its own fault the way it reports any other error.
+ */
+export function renderFailure(pen: Pen, message: string): void {
+  pen.text(0, 0, "ERROR", INK.rose);
+  pen.hline(0, pen.cols - 1, CHAR_H, "#3f6488");
+  const width = pen.textCols;
+  const words = message.split(/\s+/);
+  const lines: string[] = [];
+  let line = "";
+  for (const w of words) {
+    if ((line + " " + w).trim().length > width) {
+      lines.push(line.trim());
+      line = w;
+    } else {
+      line = `${line} ${w}`;
+    }
+  }
+  if (line.trim()) lines.push(line.trim());
+
+  lines.slice(0, pen.textRows - 4).forEach((l, i) => {
+    pen.text(0, 2 + i, pen.clip(l, width), INK.on);
+  });
+  pen.text(0, pen.textRows - 1, "PRESS ON TO RESET", INK.dim);
+}
+
 export function renderScreen(pen: Pen, s: CalcState): HitRegion[] {
   const hits: HitRegion[] = [];
   const top = chrome(pen, s);

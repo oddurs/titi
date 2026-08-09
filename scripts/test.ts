@@ -10,6 +10,8 @@ import "./solver.test";
 import "./store.test";
 import "./analysis.test";
 import "./display.test";
+import "./persistence.test";
+import "./golden.test";
 import { report } from "./harness";
 
 report();

@@ -9,6 +9,7 @@ import { keyById } from "./keys";
 import { MENUS } from "./menus";
 import type { StatReport } from "../math/stats";
 import { createReports } from "./reports";
+import { deserialize, serialize, STORAGE_KEY } from "./persistence";
 import { paramVar } from "./curves";
 import { createGraphing } from "./graphing";
 import {
@@ -134,7 +135,6 @@ export interface CalcState {
 }
 
 
-const STORAGE_KEY = "titi.state.v1";
 
 /**
  * The store initialiser, named so it can be instantiated more than once.
@@ -162,18 +162,9 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
 
   function persist() {
     if (typeof window === "undefined") return;
-    const { ys, win, modes, tbl, lists, plots, history } = get();
+    const st = get();
     try {
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-        ys, win, modes, tbl, lists, plots,
-        mats: get().mats,
-        programs: get().programs,
-        solver: get().solver,
-        history: history.slice(-30),
-      }),
-      );
+      window.localStorage.setItem(STORAGE_KEY, serialize(st));
     } catch {
       /* private mode — carry on without persistence */
     }
@@ -1146,29 +1137,17 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
 
     hydrate() {
       if (typeof window === "undefined") return;
+      let raw: string | null = null;
       try {
-        const raw = window.localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const saved = JSON.parse(raw);
-          set({
-            ys: saved.ys ?? freshYs(),
-            // Merge over the defaults: a save from an older version has no
-            // parameter window, and NaN bounds would blank the graph.
-            win: { ...STANDARD_WINDOW, ...(saved.win ?? {}) },
-            modes: { ...DEFAULT_MODES, ...(saved.modes ?? {}) },
-            tbl: saved.tbl ?? { start: 0, step: 1, auto: true },
-            lists: saved.lists ?? Array.from({ length: 6 }, () => [] as number[]),
-            plots: saved.plots ?? freshPlots(),
-            mats: saved.mats ?? { "[A]": MX.identity(2) },
-            programs: saved.programs?.length
-              ? saved.programs
-              : SAMPLE_PROGRAMS.map((p) => ({ ...p })),
-            solver: saved.solver ?? get().solver,
-            history: saved.history ?? [],
-          });
-        }
+        raw = window.localStorage.getItem(STORAGE_KEY);
       } catch {
-        /* ignore corrupt saves */
+        /* storage unavailable — start clean */
+      }
+      const { state, rejected } = deserialize(raw);
+      set(state);
+      if (rejected.length) {
+        // Say so rather than silently reverting part of someone's work.
+        note(`Reset: ${rejected.join(", ")}`);
       }
       syncEnv(get());
     },

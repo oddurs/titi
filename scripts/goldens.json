@@ -1,0 +1,416 @@
+{
+  "home-empty": {
+    "digest": "08389fb1",
+    "transcript": [
+      "HOME RAD",
+      "READY",
+      ">"
+    ]
+  },
+  "home-tape": {
+    "digest": "17c869ba",
+    "transcript": [
+      "HOME RAD",
+      "7÷8",
+      ".875",
+      "2^10",
+      "1024",
+      ">"
+    ]
+  },
+  "home-error": {
+    "digest": "381e8e64",
+    "transcript": [
+      "HOME RAD",
+      "1÷0",
+      "ERR: DIVIDE BY 0",
+      ">"
+    ]
+  },
+  "home-complex": {
+    "digest": "5ae036a2",
+    "transcript": [
+      "HOME RAD",
+      "√(-9)",
+      "3i",
+      ">"
+    ]
+  },
+  "home-matrix-answer": {
+    "digest": "e24bb191",
+    "transcript": [
+      "HOME RAD",
+      "[A][A]",
+      "[7 10]",
+      "[15 22]",
+      ">"
+    ]
+  },
+  "yeq-empty": {
+    "digest": "aeba76ef",
+    "transcript": [
+      "Y= RAD",
+      "Y₁=",
+      "Y₂=",
+      "Y₃=",
+      "Y₄=",
+      "Y₅=",
+      "Y₆="
+    ]
+  },
+  "yeq-filled": {
+    "digest": "1253b512",
+    "transcript": [
+      "Y= RAD",
+      "Y₁= X²−4",
+      "Y₂= sin(X",
+      "Y₃=",
+      "Y₄=",
+      "Y₅=",
+      "Y₆="
+    ]
+  },
+  "yeq-disabled": {
+    "digest": "ba1713d8",
+    "transcript": [
+      "Y= RAD",
+      "Y₁: : X",
+      "Y₂=",
+      "Y₃=",
+      "Y₄=",
+      "Y₅=",
+      "Y₆="
+    ]
+  },
+  "window-func": {
+    "digest": "2bb6f37e",
+    "transcript": [
+      "WINDOW RAD",
+      "Xmin= -10",
+      "Xmax= 10",
+      "Xscl= 1",
+      "Ymin= -10",
+      "Ymax= 10",
+      "Yscl= 1",
+      "Xres= 1"
+    ]
+  },
+  "window-seq": {
+    "digest": "4764e033",
+    "transcript": [
+      "WINDOW RAD SEQ",
+      "nMin= 1",
+      "nMax= 10",
+      "Xmin= -10",
+      "Xmax= 10",
+      "Xscl= 1",
+      "Ymin= -10",
+      "Ymax= 10",
+      "Yscl= 1",
+      "Xres= 1"
+    ]
+  },
+  "tblset": {
+    "digest": "bcc6d773",
+    "transcript": [
+      "TBLSET RAD",
+      "TblStart= 0",
+      "ΔTbl= 1"
+    ]
+  },
+  "table": {
+    "digest": "684873b6",
+    "transcript": [
+      "TABLE RAD",
+      "X Y₁ Y₂",
+      "0 0 0",
+      "1 1 .8414709",
+      "2 4 .9092974",
+      "3 9 .1411200",
+      "4 16 -.756802",
+      "5 25 -.958924",
+      "6 36 -.279415",
+      "7 49 .6569865",
+      "8 64 .9893582",
+      "9 81 .4121184",
+      "10 100 -.544021",
+      "11 121 -.999990",
+      "12 144 -.536572",
+      "13 169 .4201670",
+      "14 196 .9906073",
+      "15 225 .6502878",
+      "16 256 -.287903",
+      "17 289 -.961397"
+    ]
+  },
+  "mode": {
+    "digest": "6afdae11",
+    "transcript": [
+      "MODE RAD",
+      "Func Param Polar Seq <",
+      "Normal Sci Eng",
+      "Float 0 1 2 3 4 5 6 7 8 9",
+      "Radian Degree",
+      "Real a+bi",
+      "Connected Dot",
+      "Grid on Grid off",
+      "Labels on Labels off",
+      "Coords on Coords off"
+    ]
+  },
+  "graph-func": {
+    "digest": "036e9eeb",
+    "transcript": [
+      "GRAPH RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8"
+    ]
+  },
+  "graph-trace": {
+    "digest": "ccd3c116",
+    "transcript": [
+      "GRAPH TRACE RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8",
+      "Y₁ X=1.70213 Y=2.89724"
+    ]
+  },
+  "graph-zero": {
+    "digest": "3f017ca9",
+    "transcript": [
+      "GRAPH TRACE RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8",
+      "Y₁ X=2 Y="
+    ]
+  },
+  "graph-polar": {
+    "digest": "9df41d61",
+    "transcript": [
+      "GRAPH RAD POL",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8"
+    ]
+  },
+  "graph-parametric": {
+    "digest": "ab203318",
+    "transcript": [
+      "GRAPH RAD PAR",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8"
+    ]
+  },
+  "graph-sequence": {
+    "digest": "cacadf05",
+    "transcript": [
+      "GRAPH RAD SEQ",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8"
+    ]
+  },
+  "stat-lists": {
+    "digest": "f9111758",
+    "transcript": [
+      "LIST RAD",
+      "L1 L2 L3",
+      "2",
+      "4",
+      "6"
+    ]
+  },
+  "stat-report": {
+    "digest": "2ae361e0",
+    "transcript": [
+      "HOME RAD",
+      "1‑Var Stats",
+      "x̄=4",
+      "Σx=12",
+      "Σx²=56",
+      "Sx=2",
+      "σx=1.632993162",
+      "n=3",
+      "minX=2",
+      "Q₁=3",
+      "Med=4",
+      "Q₃=5",
+      "maxX=6",
+      ">"
+    ]
+  },
+  "matrix-editor": {
+    "digest": "9a3fa8ed",
+    "transcript": [
+      "MATRIX RAD",
+      "[A] 2x2",
+      "[ 1 0 ]",
+      "[ 0 1 ]"
+    ]
+  },
+  "prgm-editor": {
+    "digest": "5b94ba06",
+    "transcript": [
+      "PRGM EDIT RAD",
+      "PROGRAM:QUADRAT",
+      ": Disp \"AX²+BX+C=0\"",
+      ": Prompt A,B,C",
+      ": B²-4AC→D",
+      ": If D<0",
+      ": Then",
+      ": Disp \"NO REAL ROOTS\"",
+      ": Else",
+      ": (-B+√(D))/(2A)→X",
+      ": (-B-√(D))/(2A)→Y",
+      ": Disp \"ROOTS\",X,Y",
+      ": End"
+    ]
+  },
+  "prgm-running": {
+    "digest": "ac123cfe",
+    "transcript": [
+      "PRGM RAD",
+      "N="
+    ]
+  },
+  "prgm-done": {
+    "digest": "3aa1fa23",
+    "transcript": [
+      "PRGM RAD",
+      "55",
+      "DONE",
+      "PRESS ENTER"
+    ]
+  },
+  "solver": {
+    "digest": "856de812",
+    "transcript": [
+      "SOLVER RAD",
+      "0= X²−4",
+      "*X= -2",
+      "bound{ -100000",
+      "bound} 100000",
+      "left-rt=0"
+    ]
+  },
+  "menu-math": {
+    "digest": "55a76a2e",
+    "transcript": [
+      "HOME MATH NUM PRB RAD",
+      "1:▸Frac",
+      "2:▸Dec",
+      "3:x³",
+      "4:∛(",
+      "5:ˣ√(",
+      "6:fMin(",
+      "7:nDeriv(",
+      "8:fnInt(",
+      "9:solve(",
+      "10:Solver...",
+      "READY",
+      "> decimal to fraction"
+    ]
+  },
+  "menu-zoom": {
+    "digest": "ca3ed034",
+    "transcript": [
+      "HOME ZOOM RAD",
+      "1:ZBox",
+      "2:Zoom In",
+      "3:Zoom Out",
+      "4:ZDecimal",
+      "5:ZSquare",
+      "6:ZStandard",
+      "7:ZTrig",
+      "8:ZInteger",
+      "9:ZoomFit",
+      "READY",
+      "> drag a box on the graph"
+    ]
+  },
+  "menu-matrix": {
+    "digest": "5ae96df9",
+    "transcript": [
+      "HOME NAMES MATH EDIT RAD",
+      "1:[A]",
+      "2:[B]",
+      "3:[C]",
+      "4:[D]",
+      "5:[E]",
+      "6:[F]",
+      "7:[G]",
+      "8:[H]",
+      "9:[I]",
+      "10:[J]",
+      "READY",
+      "> 2×2"
+    ]
+  },
+  "menu-prgm": {
+    "digest": "c3bf8ed9",
+    "transcript": [
+      "HOME EXEC EDIT NEW RAD",
+      "1:QUADRAT",
+      "2:COLLATZ",
+      "3:FIB",
+      "READY",
+      ">"
+    ]
+  },
+  "modifier-2nd": {
+    "digest": "fdf566ba",
+    "transcript": [
+      "HOME RAD 2ND",
+      "READY",
+      ">"
+    ]
+  },
+  "modifier-alpha": {
+    "digest": "7db30271",
+    "transcript": [
+      "HOME RAD A",
+      "READY",
+      ">"
+    ]
+  }
+}

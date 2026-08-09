@@ -30,6 +30,7 @@ npm run build      # static export to ./out
 reads `.875`.
 
 **Graphing.** Function, parametric, polar and sequence, chosen under `MODE`.
+Move the cursor onto a slot's `=` and press enter to switch that plot off.
 The six slots are reinterpreted rather than duplicated: `Y₁`–`Y₆` in function
 mode, `r₁`–`r₆` in polar, pairs of `Xₙₜ`/`Yₙₜ` in parametric, and `u`, `v`, `w`
 with their initial terms in sequence mode — where a definition may refer to
@@ -105,7 +106,11 @@ lib/
     format.ts        ten-significant-digit display, ▸Frac
     stats.ts         1-Var, 2-Var, and five regressions
   calc/
-    store.ts         the device state machine (zustand)
+    store.ts         editing, navigation, menus, dispatch
+    graphing.ts      window, ZOOM, CALC, TRACE
+    programs.ts      running and editing programs
+    reports.ts       statistics and the solver
+    defaults.ts      the state a device powers on with
     curves.ts        one parameterisation for all three graph modes
     keys.ts          the faceplate as data
     menus.ts         menu descriptors
@@ -113,12 +118,16 @@ lib/
 scripts/
   test.ts            runs every suite and reports one total
   harness.ts         assertions
-  *.test.ts          engine, matrix, program, stats, curves
+  device.ts          an isolated device, driven by keypress
+  panel.ts           a screen rendered through a recording context
+  *.test.ts          engine, matrix, program, stats, curves, complex,
+                     solver, glyphs, analysis, store, display
 ```
 
-Nothing under `lib/math/` touches React or the DOM, and `lib/calc/curves.ts`
-takes its state as arguments — so the suites exercise the real code paths
-directly under `tsx`. 235 assertions at last count.
+Nothing under `lib/math/` touches React or the DOM, the `lib/calc` modules take
+their state as arguments, and the display only ever fills one-dot rectangles —
+so every layer is exercised directly under `tsx`, including the store and the
+panel. 606 assertions at last count.
 
 ## Design
 

@@ -7,6 +7,9 @@ import "./curves.test";
 import "./glyphs.test";
 import "./complex.test";
 import "./solver.test";
+import "./store.test";
+import "./analysis.test";
+import "./display.test";
 import { report } from "./harness";
 
 report();

@@ -17,6 +17,33 @@ Suites live in `scripts/` and share `harness.ts`. Each ends with
 when `scripts/test.ts` imports it. Run one directly with
 `npx tsx scripts/matrix.test.ts`.
 
+**Two harnesses make the non-pure layers testable without a browser.**
+
+`scripts/device.ts` builds an isolated store and drives it by keypress:
+
+```ts
+const d = device().press("y=").press("X,T,θ,n").press("x²").press("enter");
+eq("commits the slot", d.get().ys[0].expr, "X²");
+```
+
+Keys are addressed by the label printed on them, and `"2nd calc"` arms the
+modifier first — so a case reads as the sequence a person performs. Reach for
+`type("7/8")` for runs of digits and operators.
+
+`scripts/panel.ts` renders a screen through a recording context. The display
+only ever fills one-dot rectangles, so this reproduces it exactly:
+
+```ts
+const p = renderPanel(d.get());
+ok("shows the answer", shows(p, ".875"));
+ok("axis spans the panel", p.count() > 2000);
+console.log(p.art(0, 0, 60, 20));   // ASCII dump when a case fails
+```
+
+`renderPanel` **throws if any glyph misses the ROM**, so reaching a screen with
+awkward content is itself an assertion. `p.digest()` hashes the lit dots, for
+goldens.
+
 ## Architecture
 
 Three layers, and the boundaries matter:
@@ -26,10 +53,22 @@ Three layers, and the boundaries matter:
    import. The suites run it directly under `tsx`, which is why it must stay
    pure. `lib/calc/curves.ts` follows the same rule: it takes state as
    arguments so the graph modes are testable without a canvas.
-2. **`lib/calc/`** — the device state machine. One zustand store owns every
-   screen, the edit buffer, modifier state and menus. `press(keyId)` is the
-   single entry point for input; UI components dispatch into it and never
-   implement key behaviour themselves.
+2. **`lib/calc/`** — the device state machine. `press(keyId)` is the single
+   entry point for input; UI components dispatch into it and never implement
+   key behaviour themselves. `store.ts` holds the edit buffer, screen
+   navigation, menus and the action dispatcher; the self-contained parts live
+   beside it and take a small context of callbacks rather than importing the
+   store back:
+
+   | module | owns |
+   | --- | --- |
+   | `graphing.ts` | the window, ZOOM, CALC, TRACE |
+   | `programs.ts` | running and editing programs, and the live interpreter |
+   | `reports.ts` | statistics and the equation solver |
+   | `defaults.ts` | the state a device powers on with |
+
+   `createCalcStore()` builds an isolated instance; `useCalc` is the app's
+   single one. Tests use the factory.
 3. **`lib/display/`** — the panel. Screens are functions that draw into a
    buffer; there is no DOM inside the glass.
 4. **`components/`** — the hardware around the glass, and the keypad.
@@ -54,8 +93,14 @@ sample with a strict env.
 (raised exponents, radical overbars) but never changes the 1-D cursor model.
 Keep it that way; two-dimensional editing is not worth the complexity.
 
-**DEL and the arrows move by token, not character.** `prevBoundary` /
-`nextBoundary` in `lib/math/lexer.ts` do this, so `sin(` disappears in one press.
+**DEL and the arrows move by token — except inside a number.** `prevBoundary` /
+`nextBoundary` in `lib/math/lexer.ts` do this, so `sin(` disappears in one press
+but `1234` still lets you reach the 3. Treating a whole number as one token made
+the caret unable to enter it at all.
+
+**The only way to switch a function off is the `=` on the Y= screen.** ◀ from
+the start of the line puts the caret on it (`onEquals`), ENTER toggles, ▶ steps
+back. There is no other control, because the panel has no DOM to hang one on.
 
 **Values are `number | number[] | Matrix | Complex`.** `map1`/`map2` in
 `eval.ts` handle the real cases, so element-wise operations work on matrices for

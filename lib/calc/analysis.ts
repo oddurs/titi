@@ -23,15 +23,19 @@ export function findZeroNear(f: F, x0: number, lo: number, hi: number): number |
       // Reject asymptote crossings: a true root does not jump the whole window.
       const jump = Math.abs(y - prevY);
       const scale = Math.max(Math.abs(y), Math.abs(prevY));
-      if (prevY === 0) return prevX;
-      if (prevY * y < 0 && (jump < scale * 4 || scale < 1e-6)) {
-        const r = findRoot(f, prevX, x);
-        if (r !== null) {
-          const d = Math.abs(r - x0);
-          if (d < bestDist) {
-            bestDist = d;
-            best = r;
-          }
+      // A sample landing exactly on a root is a candidate like any other —
+      // returning here would hand back the first root in scan order rather
+      // than the one nearest the cursor.
+      let root: number | null = null;
+      if (prevY === 0) root = prevX;
+      else if (prevY * y < 0 && (jump < scale * 4 || scale < 1e-6)) {
+        root = findRoot(f, prevX, x);
+      }
+      if (root !== null) {
+        const d = Math.abs(root - x0);
+        if (d < bestDist) {
+          bestDist = d;
+          best = root;
         }
       }
     }

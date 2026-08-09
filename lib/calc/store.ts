@@ -1,29 +1,26 @@
 "use client";
 
-import { create } from "zustand";
-import { CalcError, clearYCache, evaluate, makeEnv, sampler, type Env } from "../math/eval";
+import { create, type StateCreator } from "zustand";
+import { CalcError, clearYCache, evaluate, makeEnv, type Env } from "../math/eval";
 import { formatMatrixRows, formatNumber, formatValue, toFraction } from "../math/format";
 import { isMatrix } from "../math/matrix";
 import { nextBoundary, prevBoundary } from "../math/lexer";
 import { keyById } from "./keys";
 import { MENUS } from "./menus";
+import type { StatReport } from "../math/stats";
+import { createReports } from "./reports";
+import { paramVar } from "./curves";
+import { createGraphing } from "./graphing";
 import {
-  expReg,
-  linReg,
-  lnReg,
-  oneVarStats,
-  pwrReg,
-  quadReg,
-  twoVarStats,
-  type StatReport,
-} from "../math/stats";
-import { buildCurves, paramRange, paramVar } from "./curves";
-import {
-  findExtremum,
-  findIntersection,
-  findZeroNear,
-} from "./analysis";
-import { PLOT_COLORS } from "./colors";
+  clamp,
+  defaultParamWindow,
+  DEFAULT_MODES,
+  freshPlots,
+  freshYs,
+  LIST_NAMES,
+  MATRIX_NAMES,
+  STANDARD_WINDOW,
+} from "./defaults";
 import {
   MODE_ROWS,
   WINDOW_FIELDS,
@@ -36,12 +33,9 @@ import {
 } from "./layout";
 import * as MX from "../math/matrix";
 import type { Matrix } from "../math/matrix";
-import { equationVariables, solveEquation } from "../math/solver";
-import {
-  Interpreter,
-  SAMPLE_PROGRAMS,
-  type ProgramSource,
-} from "../math/program";
+import { equationVariables } from "../math/solver";
+import { SAMPLE_PROGRAMS, type ProgramSource } from "../math/program";
+import { createPrograms } from "./programs";
 import type {
   CalcMark,
   EditTarget,
@@ -62,8 +56,13 @@ import type {
 
 export { PLOT_COLORS } from "./colors";
 
-const Y_NAMES = ["Y₁", "Y₂", "Y₃", "Y₄", "Y₅", "Y₆"];
-const LIST_NAMES = ["L₁", "L₂", "L₃", "L₄", "L₅", "L₆"];
+export {
+  clamp,
+  MATRIX_NAMES,
+  STANDARD_WINDOW,
+  DEFAULT_MODES,
+  defaultParamWindow,
+} from "./defaults";
 export {
   solverRows,
   MODE_ROWS,
@@ -73,51 +72,6 @@ export {
   windowLabel,
 };
 export type { ModeOption, WindowField };
-
-export const MATRIX_NAMES = "ABCDEFGHIJ".split("").map((c) => `[${c}]`);
-
-const STANDARD_WINDOW: GraphWindow = {
-  xmin: -10, xmax: 10, xscl: 1,
-  ymin: -10, ymax: 10, yscl: 1,
-  xres: 1,
-  tmin: 0, tmax: 2 * Math.PI, tstep: Math.PI / 48,
-  nmin: 1, nmax: 10,
-};
-
-const DEFAULT_MODES: Modes = {
-  graphMode: "func",
-  angle: "rad",
-  complex: "real",
-  notation: "normal",
-  decimals: -1,
-  connected: true,
-  labelAxes: true,
-  grid: true,
-  coordsOn: true,
-};
-
-/** A full turn of the parameter, in whatever unit the angle mode uses. */
-export function defaultParamWindow(modes: Modes) {
-  const turn = modes.angle === "deg" ? 360 : 2 * Math.PI;
-  return { tmin: 0, tmax: turn, tstep: turn / 96 };
-}
-
-function freshYs(): YFunction[] {
-  return Y_NAMES.map((name, i) => ({
-    id: name,
-    name,
-    expr: "",
-    on: true,
-    color: i % PLOT_COLORS.length,
-    style: "line" as const,
-  }));
-}
-
-function freshPlots(): StatPlot[] {
-  return [
-    { on: false, type: "scatter", xList: "L₁", yList: "L₂", color: 1, mark: "cross" },
-  ];
-}
 
 export interface CalcState {
   screen: ScreenId;
@@ -151,6 +105,12 @@ export interface CalcState {
   /** row cursor for the list-style screens */
   row: number;
   col: number;
+  /**
+   * On the Y= screen the caret can sit on the `=` itself, where ENTER switches
+   * the function on or off — the only place that control lives, as on the
+   * device.
+   */
+  onEquals: boolean;
   /** free-moving cursor on the graph when not tracing */
   cursor: { x: number; y: number } | null;
   graphPrompt: { op: string; stage: number; lower?: number } | null;
@@ -173,20 +133,14 @@ export interface CalcState {
   hydrate: () => void;
 }
 
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-
-/** Every regression writes its fit into Y₁, so they share one code path. */
-const REGRESSIONS: Record<string, (xs: number[], ys: number[]) => StatReport> = {
-  linreg: linReg,
-  quadreg: quadReg,
-  expreg: expReg,
-  lnreg: lnReg,
-  pwrreg: pwrReg,
-};
 
 const STORAGE_KEY = "titi.state.v1";
 
-export const useCalc = create<CalcState>((set, get) => {
+/**
+ * The store initialiser, named so it can be instantiated more than once.
+ * Tests build a fresh store per case; the app uses the single instance below.
+ */
+const initCalc: StateCreator<CalcState> = (set, get) => {
   const env = makeEnv();
 
   /** Push env in sync with the reactive slices the math engine reads. */
@@ -352,6 +306,7 @@ export const useCalc = create<CalcState>((set, get) => {
       const row = rows[target.row];
       text = row ? row.value : "";
     }
+    if (target.kind !== "yeq") set({ onEquals: false });
     const replaceOnType =
       target.kind === "window" ||
       target.kind === "tblset" ||
@@ -504,7 +459,7 @@ export const useCalc = create<CalcState>((set, get) => {
     const t = st.target;
     if (t.kind === "yeq") {
       loadEditTarget({ kind: "yeq", row: clamp(t.row + delta, 0, 5) });
-      set({ row: clamp(t.row + delta, 0, 5) });
+      set({ row: clamp(t.row + delta, 0, 5), onEquals: false });
     } else if (t.kind === "window") {
       const count = visibleWindowFields(get().modes.graphMode).length;
       const row = clamp(t.row + delta, 0, count - 1);
@@ -621,370 +576,22 @@ export const useCalc = create<CalcState>((set, get) => {
         entryFresh: false,
       });
     } else {
-      set({ screen, menu: null, target: { kind: "home" }, entryFresh: false });
+      // MODE and TABLE both read `row`, so it has to start where they expect.
+      set({ screen, menu: null, target: { kind: "home" }, entryFresh: false, row: 0 });
     }
   }
 
-  // -- graph helpers --------------------------------------------------------
+  const graphing = createGraphing({
+    get, set, env, note, persist, numberFromEntry,
+  });
+  const {
+    applyZoom, runCalc, resolveGraphPrompt,
+    startTrace, stepTrace, switchTraceFn,
+  } = graphing;
 
-  function enabledYs(): { index: number; y: YFunction }[] {
-    const st = get();
-    // In parametric mode a curve owns two slots, so ask the curve builder
-    // rather than reading the slots directly.
-    const drawn = new Set(buildCurves(st.ys, st.modes, env).map((c) => c.index));
-    return st.ys
-      .map((y, index) => ({ index, y }))
-      .filter(({ index }) => drawn.has(index));
-  }
-
-  function makeSampler(index: number): ((x: number) => number) | null {
-    const y = get().ys[index];
-    if (!y || !y.expr.trim()) return null;
-    const local = { ...env, lenient: true, vars: { ...env.vars } };
-    try {
-      return sampler(y.expr, local);
-    } catch {
-      return null;
-    }
-  }
-
-  function zoomBy(factor: number) {
-    const { win } = get();
-    const cx = (win.xmin + win.xmax) / 2;
-    const cy = (win.ymin + win.ymax) / 2;
-    const hw = ((win.xmax - win.xmin) / 2) * factor;
-    const hh = ((win.ymax - win.ymin) / 2) * factor;
-    set({
-      win: { ...win, xmin: cx - hw, xmax: cx + hw, ymin: cy - hh, ymax: cy + hh },
-      revision: get().revision + 1,
-    });
-    persist();
-  }
-
-  function applyZoom(kind: string) {
-    const st = get();
-    const w = st.win;
-    switch (kind) {
-      case "standard":
-        set({ win: { ...STANDARD_WINDOW }, screen: "graph", menu: null });
-        break;
-      case "decimal":
-        set({
-          win: { ...w, xmin: -4.7, xmax: 4.7, xscl: 1, ymin: -3.1, ymax: 3.1, yscl: 1 },
-          screen: "graph", menu: null,
-        });
-        break;
-      case "trig":
-        set({
-          win: {
-            ...w,
-            xmin: -2 * Math.PI, xmax: 2 * Math.PI, xscl: Math.PI / 2,
-            ymin: -4, ymax: 4, yscl: 1,
-          },
-          screen: "graph", menu: null,
-        });
-        break;
-      case "integer":
-        set({
-          win: { ...w, xmin: -47, xmax: 47, xscl: 10, ymin: -31, ymax: 31, yscl: 10 },
-          screen: "graph", menu: null,
-        });
-        break;
-      case "square": {
-        // Match the y scale to x using the live canvas aspect ratio.
-        const ratio = get().aspect || 1.6;
-        const cy = (w.ymin + w.ymax) / 2;
-        const hh = (w.xmax - w.xmin) / 2 / ratio;
-        set({ win: { ...w, ymin: cy - hh, ymax: cy + hh }, screen: "graph", menu: null });
-        break;
-      }
-      case "fit": {
-        // Fit whatever the current mode actually draws: function mode keeps
-        // the x window and fits y, the others fit both axes.
-        const curves = buildCurves(st.ys, st.modes, env);
-        if (!curves.length) {
-          note("ERR: NO FUNCTIONS");
-          set({ menu: null });
-          break;
-        }
-        const { min, max } = paramRange(st.modes.graphMode, w);
-        let xLo = Infinity, xHi = -Infinity, yLo = Infinity, yHi = -Infinity;
-        for (const c of curves) {
-          for (let i = 0; i <= 400; i++) {
-            const t = min + ((max - min) * i) / 400;
-            const p = c.at(t);
-            if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
-            xLo = Math.min(xLo, p.x); xHi = Math.max(xHi, p.x);
-            yLo = Math.min(yLo, p.y); yHi = Math.max(yHi, p.y);
-          }
-        }
-        if (!Number.isFinite(yLo) || yLo === yHi) {
-          // The slots are filled but nothing sampled — an undefined sequence
-          // seed is the usual reason, and it is worth saying so.
-          note("ERR: NOTHING TO FIT");
-          set({ menu: null });
-          break;
-        }
-        const padY = (yHi - yLo) * 0.1 || 1;
-        const next = { ...w, ymin: yLo - padY, ymax: yHi + padY };
-        if (st.modes.graphMode !== "func" && Number.isFinite(xLo) && xLo !== xHi) {
-          const padX = (xHi - xLo) * 0.1 || 1;
-          next.xmin = xLo - padX;
-          next.xmax = xHi + padX;
-        }
-        set({ win: next, screen: "graph", menu: null });
-        break;
-      }
-      case "in":
-        set({ screen: "graph", menu: null });
-        zoomBy(0.25);
-        break;
-      case "out":
-        set({ screen: "graph", menu: null });
-        zoomBy(4);
-        break;
-      case "box":
-        set({ screen: "graph", menu: null, graphPrompt: { op: "box", stage: 0 } });
-        note("Drag a box on the graph");
-        break;
-    }
-    set({ revision: get().revision + 1, trace: null, marks: [] });
-    persist();
-  }
-
-  // -- CALC operations ------------------------------------------------------
-
-  function currentTraceFn(): number {
-    const t = get().trace;
-    if (t) return t.fn;
-    const first = enabledYs()[0];
-    return first ? first.index : -1;
-  }
-
-  function runCalc(op: string) {
-    const st = get();
-    if (st.modes.graphMode !== "func") {
-      set({ menu: null, screen: "graph" });
-      return note("CALC needs Func mode");
-    }
-    const idx = currentTraceFn();
-    if (idx < 0) {
-      note("ERR: NO FUNCTIONS");
-      set({ menu: null, screen: "graph" });
-      return;
-    }
-    const f = makeSampler(idx);
-    if (!f) {
-      note("ERR: SYNTAX");
-      set({ menu: null, screen: "graph" });
-      return;
-    }
-    const w = st.win;
-    const x0 = st.trace?.x ?? st.cursor?.x ?? (w.xmin + w.xmax) / 2;
-    const span = w.xmax - w.xmin;
-
-    set({ menu: null, screen: "graph" });
-
-    const mark = (m: CalcMark) =>
-      set({ marks: [m], trace: { fn: idx, x: m.x }, revision: get().revision + 1 });
-
-    switch (op) {
-      case "value":
-        set({ graphPrompt: { op: "value", stage: 0 }, entry: { text: "", caret: 0 } });
-        note("x =");
-        return;
-
-      case "zero": {
-        const r = findZeroNear(f, x0, w.xmin, w.xmax);
-        if (r === null) return note("ERR: NO SIGN CHNG");
-        return mark({ kind: "point", label: "zero", x: r, y: 0, fn: idx });
-      }
-
-      case "min":
-      case "max": {
-        const r = findExtremum(f, x0, span / 8, op === "min");
-        if (r === null) return note("ERR: NO EXTREMUM");
-        return mark({ kind: "point", label: op === "min" ? "minimum" : "maximum", x: r, y: f(r), fn: idx });
-      }
-
-      case "deriv": {
-        const h = Math.max(1e-6, span * 1e-5);
-        const slope = (f(x0 + h) - f(x0 - h)) / (2 * h);
-        if (!Number.isFinite(slope)) return note("ERR: DOMAIN");
-        return mark({ kind: "tangent", label: "dy/dx", x: x0, y: f(x0), slope, fn: idx });
-      }
-
-      case "intersect": {
-        const others = enabledYs().filter((e) => e.index !== idx);
-        if (!others.length) return note("ERR: NEED 2 FUNCTIONS");
-        const g = makeSampler(others[0].index);
-        if (!g) return note("ERR: SYNTAX");
-        const r = findIntersection(f, g, x0, w.xmin, w.xmax);
-        if (r === null) return note("ERR: NO INTERSECTION");
-        return mark({ kind: "point", label: "intersect", x: r, y: f(r), fn: idx });
-      }
-
-      case "integral":
-        set({ graphPrompt: { op: "integral", stage: 0 } });
-        note("Move to the lower limit, then press enter");
-        if (!get().trace) set({ trace: { fn: idx, x: x0 } });
-        return;
-    }
-  }
-
-  function resolveGraphPrompt() {
-    const st = get();
-    const p = st.graphPrompt;
-    if (!p) return false;
-    const idx = currentTraceFn();
-    const f = idx >= 0 ? makeSampler(idx) : null;
-
-    if (p.op === "value") {
-      const x = numberFromEntry();
-      if (x === null || x === undefined || !f) {
-        note("ERR: INVALID");
-        return true;
-      }
-      set({
-        graphPrompt: null,
-        entry: { text: "", caret: 0 },
-        trace: { fn: idx, x },
-        marks: [{ kind: "point", label: "value", x, y: f(x), fn: idx }],
-        message: null,
-        revision: st.revision + 1,
-      });
-      return true;
-    }
-
-    if (p.op === "integral" && f) {
-      const x = st.trace?.x ?? 0;
-      if (p.stage === 0) {
-        set({ graphPrompt: { op: "integral", stage: 1, lower: x } });
-        note("Move to the upper limit, then press enter");
-        return true;
-      }
-      const lo = p.lower ?? x;
-      const area = integrateSampled(f, lo, x);
-      set({
-        graphPrompt: null,
-        marks: [{ kind: "area", label: "∫f(x)dx", x: lo, x2: x, y: area, fn: idx }],
-        message: null,
-        revision: st.revision + 1,
-      });
-      return true;
-    }
-
-    set({ graphPrompt: null });
-    return false;
-  }
-
-  function integrateSampled(f: (x: number) => number, a: number, b: number): number {
-    const n = 2000;
-    const h = (b - a) / n;
-    let s = 0;
-    for (let i = 0; i <= n; i++) {
-      const y = f(a + i * h);
-      if (!Number.isFinite(y)) continue;
-      const weight = i === 0 || i === n ? 1 : i % 2 ? 4 : 2;
-      s += weight * y;
-    }
-    return (s * h) / 3;
-  }
-
-  // -- trace ----------------------------------------------------------------
-
-  function startTrace() {
-    const active = enabledYs();
-    if (!active.length) {
-      set({ screen: "graph", menu: null });
-      note("ERR: NO FUNCTIONS");
-      return;
-    }
-    const st = get();
-    const mode = st.modes.graphMode;
-    const start =
-      mode === "func"
-        ? (st.win.xmin + st.win.xmax) / 2
-        : paramRange(mode, st.win).min;
-    set({
-      screen: "graph",
-      menu: null,
-      cursor: null,
-      trace: st.trace ?? { fn: active[0].index, x: start },
-      message: null,
-    });
-  }
-
-  function stepTrace(dir: number) {
-    const st = get();
-    if (!st.trace) return false;
-    const mode = st.modes.graphMode;
-    if (mode === "func") {
-      const step = ((st.win.xmax - st.win.xmin) / 94) * st.win.xres;
-      set({
-        trace: { ...st.trace, x: clamp(st.trace.x + dir * step, st.win.xmin, st.win.xmax) },
-      });
-      return true;
-    }
-    const { min, max, step } = paramRange(mode, st.win);
-    set({ trace: { ...st.trace, x: clamp(st.trace.x + dir * step, min, max) } });
-    return true;
-  }
-
-  function switchTraceFn(dir: number) {
-    const st = get();
-    if (!st.trace) return false;
-    const active = enabledYs();
-    if (active.length < 2) return true;
-    const at = active.findIndex((e) => e.index === st.trace!.fn);
-    const next = active[(at + dir + active.length) % active.length];
-    set({ trace: { ...st.trace, fn: next.index } });
-    return true;
-  }
-
-  // -- stats ----------------------------------------------------------------
-
-  function runStat(kind: string) {
-    const st = get();
-    const l1 = st.lists[0];
-    const l2 = st.lists[1];
-    set({ menu: null });
-    try {
-      if (kind === "1var") {
-        if (l1.length < 1) throw new CalcError("ERR: DIM MISMATCH");
-        set({ statReport: oneVarStats(l1), screen: "home" });
-      } else if (kind === "2var") {
-        if (l1.length < 2 || l1.length !== l2.length) throw new CalcError("ERR: DIM MISMATCH");
-        set({ statReport: twoVarStats(l1, l2), screen: "home" });
-      } else if (REGRESSIONS[kind]) {
-        if (l1.length < 2 || l1.length !== l2.length) throw new CalcError("ERR: DIM MISMATCH");
-        const report = REGRESSIONS[kind](l1, l2);
-        const ys = st.ys.map((y, i) => (i === 0 ? { ...y, expr: report.expr!, on: true } : y));
-        set({ statReport: report, ys, screen: "home", revision: st.revision + 1 });
-        syncEnv({ ys });
-        persist();
-      } else if (kind === "clear") {
-        const lists = st.lists.map(() => [] as number[]);
-        set({ lists, statReport: null, revision: st.revision + 1 });
-        syncEnv({ lists });
-        persist();
-        note("Lists cleared");
-      } else if (kind === "sortA") {
-        const lists = st.lists.map((l) => [...l]);
-        const order = lists[0].map((v, i) => [v, i] as const).sort((a, b) => a[0] - b[0]);
-        for (let c = 0; c < 6; c++) {
-          if (lists[c].length === order.length) {
-            lists[c] = order.map(([, i]) => lists[c][i]);
-          }
-        }
-        set({ lists, revision: st.revision + 1 });
-        syncEnv({ lists });
-        persist();
-      }
-    } catch (e) {
-      note(e instanceof CalcError ? e.message : "ERR: INVALID");
-    }
-  }
+  const { runStat, runSolve } = createReports({
+    get, set, env, note, persist, syncEnv, loadEditTarget,
+  });
 
   /** Applying modes may need to reset the parameter window and clear marks. */
   function applyModes(modes: Modes) {
@@ -1006,111 +613,12 @@ export const useCalc = create<CalcState>((set, get) => {
     persist();
   }
 
-  /** Solve the equation for one variable and write the answer back into it. */
-  function runSolve(target: string) {
-    const st = get();
-    const { equation, values, bound } = st.solver;
-    if (!equation.trim()) return note("ERR: NO EQUATION");
-    syncEnv();
-    const known: Record<string, number> = {};
-    for (const [k, v] of Object.entries(values)) {
-      if (k !== target) known[k] = v;
-    }
-    try {
-      const { value, residual } = solveEquation(
-        { equation, target, known, guess: values[target] ?? 0, bound },
-        env,
-      );
-      set({
-        solver: {
-          ...st.solver,
-          target,
-          values: { ...values, [target]: value },
-          residual,
-        },
-        message: null,
-      });
-      // show the answer in the row that was just solved
-      const at = solverRows(get().solver).findIndex(
-        (r) => r.kind === "var" && r.name === target,
-      );
-      if (at >= 0) loadEditTarget({ kind: "solver", row: at });
-      persist();
-    } catch (e) {
-      note(e instanceof CalcError ? e.message : "ERR: SYNTAX");
-    }
-  }
-
-  // -- programs ---------------------------------------------------------------
-
-  /** The live interpreter is deliberately outside reactive state. */
-  let vm: Interpreter | null = null;
-
-  function pumpProgram() {
-    if (!vm) return;
-    const st = get();
-    const status = vm.run();
-    const base = { name: st.prgmRun?.name ?? "", output: [...vm.output] };
-
-    if (status.kind === "input") {
-      set({
-        prgmRun: { ...base, status: "input", prompt: status.prompt },
-        entry: { text: "", caret: 0 },
-      });
-    } else if (status.kind === "pause") {
-      set({ prgmRun: { ...base, status: "pause" } });
-    } else if (status.kind === "error") {
-      set({ prgmRun: { ...base, status: "error", message: status.message } });
-      vm = null;
-    } else {
-      set({ prgmRun: { ...base, status: "done" } });
-      vm = null;
-    }
-    // A program can store into Y-vars, lists or matrices.
-    set({ mats: { ...env.mats }, revision: get().revision + 1 });
-    persist();
-  }
-
-  function startProgram(name: string) {
-    const st = get();
-    const src = st.programs.find((p) => p.name === name);
-    if (!src) return note("ERR: UNDEFINED");
-    syncEnv();
-    vm = new Interpreter(
-      src,
-      env,
-      { notation: st.modes.notation, decimals: st.modes.decimals },
-      (n) => get().programs.find((p) => p.name === n),
-    );
-    set({
-      screen: "prgmrun",
-      menu: null,
-      message: null,
-      target: { kind: "home" },
-      entry: { text: "", caret: 0 },
-      prgmRun: { name, output: [], status: "pause" },
-    });
-    pumpProgram();
-  }
-
-  function editProgram(name: string) {
-    const src = get().programs.find((p) => p.name === name);
-    if (!src) return note("ERR: UNDEFINED");
-    const lines = src.body.split("\n");
-    set({ prgmName: name, prgmLines: lines.length ? lines : [""], menu: null });
-    gotoScreen("prgm");
-  }
-
-  function newProgram() {
-    const st = get();
-    let n = 1;
-    while (st.programs.some((p) => p.name === `PRGM${n}`)) n += 1;
-    const name = `PRGM${n}`;
-    const programs = [...st.programs, { name, body: "" }];
-    set({ programs, prgmName: name, prgmLines: [""], menu: null });
-    persist();
-    gotoScreen("prgm");
-  }
+  const {
+    pumpProgram, startProgram, editProgram, newProgram,
+    provideInput, resumeProgram,
+  } = createPrograms({
+    get, set, env, note, persist, syncEnv, gotoScreen,
+  });
 
   // -- menus ----------------------------------------------------------------
 
@@ -1371,17 +879,25 @@ export const useCalc = create<CalcState>((set, get) => {
           const run = st.prgmRun;
           if (!run) return gotoScreen("home");
           if (run.status === "input") {
-            vm?.provideInput(st.entry.text);
+            provideInput(st.entry.text);
             set({ entry: { text: "", caret: 0 } });
             return pumpProgram();
           }
           if (run.status === "pause") {
-            vm?.resume();
+            resumeProgram();
             return pumpProgram();
           }
           // done or error — ENTER returns to the home screen
           set({ prgmRun: null });
           return gotoScreen("home");
+        }
+        if (st.target.kind === "yeq" && st.onEquals) {
+          const row = st.target.row;
+          const ys = st.ys.map((y, i) => (i === row ? { ...y, on: !y.on } : y));
+          set({ ys, marks: [], trace: null, revision: st.revision + 1 });
+          syncEnv({ ys });
+          persist();
+          return;
         }
         if (st.target.kind === "solver") {
           commitTarget();
@@ -1472,6 +988,12 @@ export const useCalc = create<CalcState>((set, get) => {
         }
         if (st.screen === "stat" && moveCol(dir)) return;
         if (st.screen === "matrix" && moveMatCol(dir)) return;
+        if (st.target.kind === "yeq") {
+          if (dir < 0 && st.entry.caret === 0 && !st.onEquals) {
+            return set({ onEquals: true });
+          }
+          if (dir > 0 && st.onEquals) return set({ onEquals: false });
+        }
         // Within an edit buffer the arrows walk the caret token by token.
         const { entry } = get();
         const caret =
@@ -1548,6 +1070,7 @@ export const useCalc = create<CalcState>((set, get) => {
     },
     row: 0,
     col: 0,
+    onEquals: false,
     cursor: null,
     graphPrompt: null,
     message: null,
@@ -1650,7 +1173,12 @@ export const useCalc = create<CalcState>((set, get) => {
       syncEnv(get());
     },
   };
-});
+};
+
+/** A fresh, isolated device. */
+export const createCalcStore = () => create<CalcState>(initCalc);
+
+export const useCalc = createCalcStore();
 
 /** The canvas reports its aspect ratio so ZSquare can do the right thing. */
 export function reportAspect(ratio: number) {

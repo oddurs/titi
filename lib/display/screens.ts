@@ -207,6 +207,10 @@ function renderYeq(pen: Pen, s: CalcState, top: number, hits: HitRegion[]) {
     const mark = y.on ? "=" : ":";
     const head = `${label}${mark}`;
     pen.text(0, row, head, y.on ? INK.on : INK.dim);
+    // The caret can rest on the = itself, where enter switches the plot on.
+    if (i === active && s.onEquals) {
+      pen.inverse(label.length, row, 1, mark, INK.accent);
+    }
     // a colour tick so the slot and its curve are connected
     pen.fill(0, rowAt(0, row) + CHAR_H - 3, CHAR_W - 2, 1,
       PLOT_COLORS[y.color % PLOT_COLORS.length]);

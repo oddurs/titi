@@ -326,14 +326,18 @@ function normalizeOp(op: string): string {
 /**
  * Index of the token boundary immediately left of `caret`, used by DEL and ◀
  * so multi-character tokens behave as one unit.
+ *
+ * A number is the exception: its digits each step separately, because a person
+ * editing 1234 expects to reach the 3, not to lose the lot. Everything else —
+ * `sin(`, `⁻¹`, `L₁` — moves and deletes whole.
  */
 export function prevBoundary(src: string, caret: number): number {
   if (caret <= 0) return 0;
   const toks = lex(src);
   let best = caret - 1;
   for (const t of toks) {
-    if (t.end === caret) return t.start;
-    if (t.start < caret && caret < t.end) return t.start;
+    const inside = t.start < caret && caret <= t.end;
+    if (inside) return t.kind === "num" ? caret - 1 : t.start;
     if (t.end < caret) best = t.end;
   }
   return Math.max(0, Math.min(best, caret - 1));
@@ -343,8 +347,8 @@ export function nextBoundary(src: string, caret: number): number {
   if (caret >= src.length) return src.length;
   const toks = lex(src);
   for (const t of toks) {
-    if (t.start === caret) return t.end;
-    if (t.start < caret && caret < t.end) return t.end;
+    const inside = t.start <= caret && caret < t.end;
+    if (inside) return t.kind === "num" ? caret + 1 : t.end;
     if (t.start > caret) return t.start;
   }
   return src.length;

@@ -110,15 +110,15 @@ thresholded, then blown up. Three consequences worth knowing before touching it:
   opacities of one.
 - **Draw on integers.** `Pen` plots lines with Bresenham rather than stroking,
   so nothing relies on the threshold to look straight.
+- **Text comes from a character ROM, not a font.** `lib/display/glyphs.ts` holds
+  every glyph as a 5×7 bitmap in a 6×8 cell. Rasterising a pixel font and
+  thresholding it looked close but never landed — a stem falling between two
+  dots either doubles or vanishes, which is what made round glyphs like 6 and 8
+  malformed. Add a symbol to the table, not to the font stack. Subscripts fold
+  to plain digits because a 5×7 cell has no room for them.
 - **`ctx.font` cannot resolve CSS variables**, and canvas alone never triggers a
-  font download. `Screen.tsx` resolves the stack from `getComputedStyle` and
-  calls `document.fonts.load` before the first paint. Skip either and everything
-  silently renders in a fallback.
-
-Glyphs the pixel face lacks (π √ θ ² ⁻¹ ≠ ≤ ≥ …) are hand-drawn in
-`lib/display/glyphs.ts` on the same 5×7 grid; subscripts fold to plain digits
-because a 5×7 cell has no room for them. Add a symbol there, not to the font
-stack.
+  font download. `Screen.tsx` resolves the fallback stack from
+  `getComputedStyle` and calls `document.fonts.load` before the first paint.
 
 A screen renderer returns hit regions so taps can still select rows — the panel
 has no DOM, so that is the only pointer affordance.
@@ -142,9 +142,9 @@ The screen is an edge-lit panel: `.screen` stays dark and even, and the lamp is
 a short falloff on `.screen-body::before`. Do not put a large glow on `.screen`
 itself — it fogs the whole field.
 
-Three type roles: `--font-ui` (Barlow) letters the hardware, `--font-display`
-(Silkscreen) letters the panel, `--font-mono` (IBM Plex Mono) is the panel's
-fallback for glyphs Silkscreen lacks.
+Two type roles: `--font-ui` (Barlow) letters the hardware; `--font-mono`
+(IBM Plex Mono) is the panel's fallback for anything missing from the ROM. The
+panel itself has no typeface.
 
 ## Verifying UI work
 

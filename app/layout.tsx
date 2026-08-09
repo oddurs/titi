@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, IBM_Plex_Mono, Silkscreen } from "next/font/google";
+import { Barlow, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
 /**
@@ -10,21 +10,14 @@ import "./globals.css";
  * licence-plate lineage. It is slightly narrow, which is what lets "stat plot"
  * sit on a keycap without shrinking.
  *
- * The display is a dot-matrix panel, so it is lettered in Silkscreen — a face
- * drawn on a pixel grid rather than smoothed onto one. Glyphs Silkscreen does
- * not carry (π, √, θ, subscripts) fall back to IBM Plex Mono and are quantised
- * by the panel's threshold, so every source of ink ends up on the same grid.
+ * The display has no typeface at all: it draws from a 5×7 character ROM in
+ * lib/display/glyphs.ts, the way the device it is modelled on does. IBM Plex
+ * Mono stays as the panel's fallback for any glyph the ROM lacks.
  */
 const ui = Barlow({
   variable: "--font-ui",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-});
-
-const display = Silkscreen({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["400"],
 });
 
 const mono = IBM_Plex_Mono({
@@ -52,7 +45,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${ui.variable} ${display.variable} ${mono.variable}`}>
+      <body className={`${ui.variable} ${mono.variable}`}>
         {children}
       </body>
     </html>

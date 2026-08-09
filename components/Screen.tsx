@@ -18,9 +18,9 @@ export default function Screen() {
   const panelRef = useRef<DotPanel | null>(null);
   const hitsRef = useRef<HitRegion[]>([]);
   const [size, setSize] = useState({ w: 0, h: 0 });
-  // Canvas cannot resolve CSS variables in ctx.font, and nothing in the
-  // stylesheet renders with the display face — so the stack is resolved here
-  // and the faces are loaded explicitly before the first paint.
+  // Almost everything comes from the character ROM, but canvas cannot resolve
+  // CSS variables in ctx.font and never triggers a font download on its own —
+  // so the fallback stack is resolved and loaded before the first paint.
   const [fontStack, setFontStack] = useState("8px monospace");
 
   // Subscribing to the whole store is right here: any change repaints the glass.
@@ -29,14 +29,10 @@ export default function Screen() {
   useEffect(() => {
     let cancelled = false;
     const css = getComputedStyle(document.body);
-    const display = css.getPropertyValue("--font-display").trim();
     const mono = css.getPropertyValue("--font-mono").trim();
-    const stack = `8px ${display}, ${mono}, ui-monospace, monospace`;
+    const stack = `8px ${mono}, ui-monospace, monospace`;
 
-    Promise.all([
-      document.fonts.load(`8px ${display}`),
-      document.fonts.load(`8px ${mono}`),
-    ])
+    Promise.all([document.fonts.load(`8px ${mono}`)])
       .catch(() => undefined)
       .then(() => {
         if (!cancelled) setFontStack(stack);

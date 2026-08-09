@@ -82,7 +82,7 @@ lib/
   display/           the dot-matrix panel
     panel.ts         buffer, threshold, dot grid, bloom
     pen.ts           dots, lines, character cells
-    glyphs.ts        the maths symbols, drawn on the same 5×7 grid
+    glyphs.ts        the 5×7 character ROM
     screens.ts       every screen as a character-cell layout
     graph.ts         the plot, drawn dot by dot
   math/              lexer → parser → AST → compiled closures
@@ -122,12 +122,10 @@ blown up with the inter-dot gaps cut back in. Because the threshold is on alpha
 alone, colour survives — so curves, the trace cursor and error text each keep
 their own hue while sharing one grid.
 
-Two typographic worlds, the way a real instrument has them. The hardware is
-lettered in Barlow, a low-contrast grotesque from the signage lineage, narrow
-enough to fit `stat plot` on a keycap. The panel is lettered in Silkscreen —
-drawn on a pixel grid rather than smoothed onto one — with the maths symbols
-Silkscreen doesn't carry hand-drawn on the same 5×7 grid, so nothing on the
-glass looks pasted in from another font.
+The hardware is lettered in Barlow, a low-contrast grotesque from the signage
+lineage, narrow enough to fit `stat plot` on a keycap. The panel has no
+typeface at all — it draws from a 5×7 character ROM, the way the device it is
+modelled on does, so every glyph lands exactly on the dot grid.
 
 Blue means `2ND` and green means `ALPHA`, and those two colours appear nowhere
 else — so a glance at the keypad always answers what a key will do right now.

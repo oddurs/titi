@@ -9,12 +9,13 @@
  */
 
 /**
- * Character cell, in dots. Silkscreen advances 6 dots at 8px, so the cell is
- * 6 wide with a 5×7 glyph box — the same grid the hand-drawn maths glyphs use.
+ * A 5×7 glyph in a 6×8 cell — the geometry a TI-84 uses. Every glyph comes
+ * from the ROM table, so nothing depends on how the browser happens to
+ * rasterise a font at 8px.
  */
 export const CHAR_W = 6;
-export const CHAR_H = 9;
-/** Baseline offset inside a cell, for font-rendered glyphs. */
+export const CHAR_H = 8;
+/** Baseline offset inside a cell, for the rare glyph with no ROM entry. */
 const BASELINE = 7;
 
 export const INK = {

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { Barlow, IBM_Plex_Mono, Silkscreen } from "next/font/google";
 import "./globals.css";
 
 /**
@@ -10,9 +10,10 @@ import "./globals.css";
  * licence-plate lineage. It is slightly narrow, which is what lets "stat plot"
  * sit on a keycap without shrinking.
  *
- * The screen is set in IBM Plex: a family drawn for machines, with unambiguous
- * glyphs, a true italic for variables, and a monospace cut that shares its
- * skeleton for coordinates and tables.
+ * The display is a dot-matrix panel, so it is lettered in Silkscreen — a face
+ * drawn on a pixel grid rather than smoothed onto one. Glyphs Silkscreen does
+ * not carry (π, √, θ, subscripts) fall back to IBM Plex Mono and are quantised
+ * by the panel's threshold, so every source of ink ends up on the same grid.
  */
 const ui = Barlow({
   variable: "--font-ui",
@@ -20,11 +21,10 @@ const ui = Barlow({
   weight: ["400", "500", "600", "700"],
 });
 
-const math = IBM_Plex_Sans({
-  variable: "--font-math",
+const display = Silkscreen({
+  variable: "--font-display",
   subsets: ["latin"],
-  style: ["normal", "italic"],
-  weight: ["400", "500", "600"],
+  weight: ["400"],
 });
 
 const mono = IBM_Plex_Mono({
@@ -52,7 +52,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${ui.variable} ${math.variable} ${mono.variable}`}>
+      <body className={`${ui.variable} ${display.variable} ${mono.variable}`}>
         {children}
       </body>
     </html>

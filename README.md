@@ -1,12 +1,13 @@
 # titi
 
-A scientific and graphing calculator for the browser. It keeps the TI-84 Plus's
+A scientific and graphing calculator for the browser, with the TI-84 Plus's
 keypad and workflow — every key in its real position, `2ND` and `ALPHA`
-modifiers, the `Y=` → `WINDOW` → `GRAPH` → `TRACE` loop — and throws away the
-96×64 dot-matrix display.
+modifiers, the `Y=` → `WINDOW` → `GRAPH` → `TRACE` loop.
 
-Expressions typeset like a textbook. Curves are drawn as antialiased vector
-paths with real axis labels. Works on a phone and a laptop.
+The display is a real dot-matrix panel: everything is drawn at one dot per
+physical pixel, thresholded to lit-or-not, and blown up with the grid between
+dots left visible. In colour, so curves keep theirs. Works on a phone and a
+laptop.
 
 ## Run it
 
@@ -75,12 +76,15 @@ keys drive the cursor, the trace and the menus.
 app/                 route, fonts, and the whole stylesheet
 components/
   Device.tsx         shell, brand rail, layout
-  Screen.tsx         picks a screen, hosts menus and toasts
+  Screen.tsx         hosts the panel, routes pointer input
   Keypad.tsx         key grid, modifier state, physical keyboard
-  Plot.tsx           canvas renderer and pointer interaction
-  MathText.tsx       linear expression → typeset math
-  screens/           home, Y=, window, table, mode, stat editor
 lib/
+  display/           the dot-matrix panel
+    panel.ts         buffer, threshold, dot grid, bloom
+    pen.ts           dots, lines, character cells
+    glyphs.ts        the maths symbols, drawn on the same 5×7 grid
+    screens.ts       every screen as a character-cell layout
+    graph.ts         the plot, drawn dot by dot
   math/              lexer → parser → AST → compiled closures
     lexer.ts         longest-match tokeniser with source spans
     parser.ts        precedence climbing, TI's associativity rules
@@ -112,15 +116,18 @@ sit on: the keypad plate and display well are milled into the shell, keycaps are
 raised out of apertures in the plate. The body is warm graphite; the screen is
 cool ink. Hardware is tactile, and everything on the screen stays flat.
 
-The display is an edge-lit panel — a header band across the top, the field
-below it, and the entry line docked at the foot so the caret never scrolls
-away. On the home screen, entries accumulate upward as a ruled tape.
+The display is a dot-matrix panel. Everything renders into a buffer at one
+pixel per dot, gets thresholded so a dot is either lit or it isn't, and is then
+blown up with the inter-dot gaps cut back in. Because the threshold is on alpha
+alone, colour survives — so curves, the trace cursor and error text each keep
+their own hue while sharing one grid.
 
 Two typographic worlds, the way a real instrument has them. The hardware is
 lettered in Barlow, a low-contrast grotesque from the signage lineage, narrow
-enough to fit `stat plot` on a keycap. The screen is set in IBM Plex — drawn
-for machines, with unambiguous glyphs, a true italic for variables, and a
-monospace cut sharing its skeleton for coordinates and tables.
+enough to fit `stat plot` on a keycap. The panel is lettered in Silkscreen —
+drawn on a pixel grid rather than smoothed onto one — with the maths symbols
+Silkscreen doesn't carry hand-drawn on the same 5×7 grid, so nothing on the
+glass looks pasted in from another font.
 
 Blue means `2ND` and green means `ALPHA`, and those two colours appear nowhere
 else — so a glance at the keypad always answers what a key will do right now.

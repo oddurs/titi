@@ -23,6 +23,16 @@ import {
   findIntersection,
   findZeroNear,
 } from "./analysis";
+import { PLOT_COLORS } from "./colors";
+import {
+  MODE_ROWS,
+  WINDOW_FIELDS,
+  WINDOW_LABELS,
+  visibleWindowFields,
+  windowLabel,
+  type ModeOption,
+  type WindowField,
+} from "./layout";
 import * as MX from "../math/matrix";
 import type { Matrix } from "../math/matrix";
 import {
@@ -47,118 +57,20 @@ import type {
   YFunction,
 } from "./types";
 
-export const PLOT_COLORS = [
-  "#5AA9FF", // azure
-  "#FF6B8A", // rose
-  "#3FD99B", // mint
-  "#FFB454", // amber
-  "#B98CFF", // iris
-  "#4FD8E8", // cyan
-];
+export { PLOT_COLORS } from "./colors";
 
 const Y_NAMES = ["Y₁", "Y₂", "Y₃", "Y₄", "Y₅", "Y₆"];
 const LIST_NAMES = ["L₁", "L₂", "L₃", "L₄", "L₅", "L₆"];
-export const MATRIX_NAMES = "ABCDEFGHIJ".split("").map((c) => `[${c}]`);
-
-export const WINDOW_FIELDS = [
-  "tmin", "tmax", "tstep",
-  "xmin", "xmax", "xscl", "ymin", "ymax", "yscl", "xres",
-] as const;
-
-/** The parameter bounds only exist in parametric and polar modes. */
-export const visibleWindowFields = (mode: Modes["graphMode"]) =>
-  mode === "func" ? WINDOW_FIELDS.slice(3) : WINDOW_FIELDS;
-export type WindowField = (typeof WINDOW_FIELDS)[number];
-
-export const WINDOW_LABELS: Record<WindowField, string> = {
-  xmin: "Xmin", xmax: "Xmax", xscl: "Xscl",
-  ymin: "Ymin", ymax: "Ymax", yscl: "Yscl", xres: "Xres",
-  tmin: "Tmin", tmax: "Tmax", tstep: "Tstep",
+export {
+  MODE_ROWS,
+  WINDOW_FIELDS,
+  WINDOW_LABELS,
+  visibleWindowFields,
+  windowLabel,
 };
+export type { ModeOption, WindowField };
 
-/** Polar mode calls the same three fields θ rather than T. */
-export const windowLabel = (
-  field: WindowField,
-  mode: Modes["graphMode"],
-): string =>
-  mode === "pol" && field.startsWith("t")
-    ? WINDOW_LABELS[field].replace("T", "θ")
-    : WINDOW_LABELS[field];
-
-export interface ModeOption {
-  key: keyof Modes;
-  choices: { value: Modes[keyof Modes]; label: string }[];
-  hint: string;
-}
-
-export const MODE_ROWS: ModeOption[] = [
-  {
-    key: "graphMode",
-    hint: "what the Y= slots mean",
-    choices: [
-      { value: "func", label: "Func" },
-      { value: "par", label: "Parametric" },
-      { value: "pol", label: "Polar" },
-    ],
-  },
-  {
-    key: "notation",
-    hint: "how answers are written",
-    choices: [
-      { value: "normal", label: "Normal" },
-      { value: "sci", label: "Sci" },
-      { value: "eng", label: "Eng" },
-    ],
-  },
-  {
-    key: "decimals",
-    hint: "digits after the point",
-    choices: [
-      { value: -1, label: "Float" },
-      ...Array.from({ length: 10 }, (_, i) => ({ value: i, label: String(i) })),
-    ],
-  },
-  {
-    key: "angle",
-    hint: "unit for trigonometry",
-    choices: [
-      { value: "rad", label: "Radian" },
-      { value: "deg", label: "Degree" },
-    ],
-  },
-  {
-    key: "connected",
-    hint: "curve drawing",
-    choices: [
-      { value: true, label: "Connected" },
-      { value: false, label: "Dot" },
-    ],
-  },
-  {
-    key: "grid",
-    hint: "background rulings",
-    choices: [
-      { value: true, label: "Grid on" },
-      { value: false, label: "Grid off" },
-    ],
-  },
-  {
-    key: "labelAxes",
-    hint: "x and y captions",
-    choices: [
-      { value: true, label: "Labels on" },
-      { value: false, label: "Labels off" },
-    ],
-  },
-  {
-    key: "coordsOn",
-    hint: "readout under the cursor",
-    choices: [
-      { value: true, label: "Coords on" },
-      { value: false, label: "Coords off" },
-    ],
-  },
-];
+export const MATRIX_NAMES = "ABCDEFGHIJ".split("").map((c) => `[${c}]`);
 
 const STANDARD_WINDOW: GraphWindow = {
   xmin: -10, xmax: 10, xscl: 1,
@@ -244,6 +156,8 @@ export interface CalcState {
   aspect: number;
 
   press: (id: string) => void;
+  /** tap-to-select on a list screen, now that the panel has no DOM rows */
+  selectRow: (index: number) => void;
   typeText: (text: string) => void;
   setWindow: (patch: Partial<GraphWindow>) => void;
   setTrace: (t: TraceState | null) => void;
@@ -1550,6 +1464,17 @@ export const useCalc = create<CalcState>((set, get) => {
 
       if (key.act) return runAction(key.act);
       if (key.ins) return insert(key.ins);
+    },
+
+    selectRow(index: number) {
+      const st = get();
+      if (st.menu) return;
+      if (st.screen === "mode") return set({ row: index });
+      const t = st.target;
+      if (t.kind === "yeq") { commitTarget(); loadEditTarget({ kind: "yeq", row: index }); }
+      else if (t.kind === "window") { commitTarget(); loadEditTarget({ kind: "window", row: index }); }
+      else if (t.kind === "tblset") { commitTarget(); loadEditTarget({ kind: "tblset", row: index }); }
+      else if (t.kind === "prgm") { commitTarget(); loadEditTarget({ kind: "prgm", line: index }); }
     },
 
     typeText(text: string) {

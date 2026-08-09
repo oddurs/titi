@@ -30,7 +30,9 @@ Three layers, and the boundaries matter:
    screen, the edit buffer, modifier state and menus. `press(keyId)` is the
    single entry point for input; UI components dispatch into it and never
    implement key behaviour themselves.
-3. **`components/`** — rendering only. Read from the store, call `press`.
+3. **`lib/display/`** — the panel. Screens are functions that draw into a
+   buffer; there is no DOM inside the glass.
+4. **`components/`** — the hardware around the glass, and the keypad.
 
 `lib/calc/keys.ts` is the faceplate as data (label, 2nd label, alpha label, what
 each inserts or invokes). `lib/calc/menus.ts` is the menus as data. Adding a key
@@ -97,10 +99,36 @@ Do not "fix" these — they are tested:
   actually be present (`"".includes()` is true for every string, which is how
   that bug got in)
 
+## The display
+
+Everything on screen is drawn into an offscreen canvas at **one pixel per dot**,
+thresholded, then blown up. Three consequences worth knowing before touching it:
+
+- **Alpha is binary, so colour is the only brightness control.** A translucent
+  ink does not come out dimmer — it comes out lit or absent. Use a darker RGB
+  instead. This is why the graph has three distinct greys rather than three
+  opacities of one.
+- **Draw on integers.** `Pen` plots lines with Bresenham rather than stroking,
+  so nothing relies on the threshold to look straight.
+- **`ctx.font` cannot resolve CSS variables**, and canvas alone never triggers a
+  font download. `Screen.tsx` resolves the stack from `getComputedStyle` and
+  calls `document.fonts.load` before the first paint. Skip either and everything
+  silently renders in a fallback.
+
+Glyphs the pixel face lacks (π √ θ ² ⁻¹ ≠ ≤ ≥ …) are hand-drawn in
+`lib/display/glyphs.ts` on the same 5×7 grid; subscripts fold to plain digits
+because a 5×7 cell has no room for them. Add a symbol there, not to the font
+stack.
+
+A screen renderer returns hit regions so taps can still select rows — the panel
+has no DOM, so that is the only pointer affordance.
+
 ## CSS
 
 One stylesheet, `app/globals.css`, in plain CSS with custom properties. Tailwind
-is installed but unused for this UI — do not mix approaches.
+is installed but unused for this UI — do not mix approaches. It now styles only
+the hardware: shell, bezel, keypad, arrow cluster. Anything inside the glass is
+drawn, not styled.
 
 **The phone block lives at the end of the file and must stay there.** It
 overrides base rules by source order, not specificity. A rule added below it
@@ -114,9 +142,9 @@ The screen is an edge-lit panel: `.screen` stays dark and even, and the lamp is
 a short falloff on `.screen-body::before`. Do not put a large glow on `.screen`
 itself — it fogs the whole field.
 
-Three type roles: `--font-ui` (Barlow) is hardware lettering, `--font-math`
-(IBM Plex Sans) is screen content, `--font-mono` (IBM Plex Mono) is readouts
-and tables. Hardware and screen are deliberately different faces.
+Three type roles: `--font-ui` (Barlow) letters the hardware, `--font-display`
+(Silkscreen) letters the panel, `--font-mono` (IBM Plex Mono) is the panel's
+fallback for glyphs Silkscreen lacks.
 
 ## Verifying UI work
 

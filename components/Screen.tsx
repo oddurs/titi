@@ -42,10 +42,10 @@ export default function Screen() {
 
         <div className="screen-head">
           <b>{TITLES[screen] ?? screen}</b>
-          <span style={{ display: "flex", gap: 10 }}>
-            {screen === "graph" && trace && <span style={{ color: "var(--amber)" }}>trace</span>}
-            {!insertMode && <span>overwrite</span>}
-            <span>{modes.angle === "rad" ? "rad" : "deg"}</span>
+          <span className="screen-status">
+            {screen === "graph" && trace && <span data-live="true">trace</span>}
+            {!insertMode && <span data-live="true">overwrite</span>}
+            <span>{modes.angle}</span>
             <span>{modes.notation}</span>
             <span>{modes.decimals < 0 ? "float" : `fix ${modes.decimals}`}</span>
           </span>

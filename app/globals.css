@@ -299,15 +299,31 @@ button {
   min-height: 0;
   overflow: hidden;
   border-radius: 7px;
-  background:
-    radial-gradient(145% 105% at 50% -12%, var(--ink-glow) 0%, var(--ink) 60%);
+  background: linear-gradient(180deg, #0a121b 0%, var(--ink) 42%, #04080d 100%);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.9),
     0 0 0 1px rgba(120, 180, 255, 0.07) inset,
-    /* backlight bleeding past the edges, the way an LCD does */
-    0 0 34px -6px rgba(86, 166, 240, 0.16);
+    /* a little of the lamp escaping the panel edge */
+    0 0 22px -8px rgba(86, 166, 240, 0.2);
   display: flex;
   flex-direction: column;
+}
+
+/* The backlight bar: a short, even falloff from the top of the active area.
+   Confined to ~72px so the field below stays properly dark. */
+.screen-body::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 72px;
+  background: linear-gradient(
+    180deg,
+    rgba(122, 182, 245, 0.055) 0%,
+    rgba(122, 182, 245, 0.014) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* Cover glass: one soft off-axis reflection and a vignette. Nothing that
@@ -330,30 +346,55 @@ button {
     inset 0 0 22px rgba(0, 0, 0, 0.35);
 }
 
+/* A fixed header band across the top of the panel, stepped down from the
+   field by a dark rule with a lit edge under it. */
 .screen-head {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--line-soft);
+  padding: 9px 15px 8px;
+  background: linear-gradient(
+    180deg,
+    rgba(140, 190, 240, 0.1) 0%,
+    rgba(140, 190, 240, 0.03) 100%
+  );
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.6),
+    0 2px 0 rgba(255, 255, 255, 0.05);
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--faint);
   flex: none;
+  z-index: 2;
 }
 
 .screen-head b {
-  color: var(--muted);
+  color: #b3c3d6;
   font-weight: 600;
+}
+
+.screen-status {
+  color: #6d7a8a;
+}
+
+.screen-status {
+  display: flex;
+  gap: 11px;
+}
+
+.screen-status span[data-live="true"] {
+  color: var(--amber);
 }
 
 .screen-body {
   flex: 1;
   min-height: 0;
   position: relative;
+  isolation: isolate;
 }
 
 .pane {
@@ -361,7 +402,7 @@ button {
   inset: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 14px;
+  padding: 14px 16px;
   scrollbar-width: thin;
   scrollbar-color: var(--faint) transparent;
 }
@@ -479,62 +520,113 @@ button {
 
 /* --- home screen --------------------------------------------------------- */
 
-.pane[data-anchor="bottom"],
-.pane[data-anchor="center"] {
+/* A scrolling tape above a fixed entry dock. */
+.pane-stack {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
-.pane[data-anchor="bottom"] { justify-content: flex-end; }
-.pane[data-anchor="center"] { justify-content: center; }
-
-.history {
+.tape {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-bottom: 4px;
-  /* keep the question and its answer visually paired on wide screens */
+  justify-content: flex-end;
+  padding: 14px 16px 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+.tape::-webkit-scrollbar { width: 6px; }
+.tape::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 99px;
+}
+
+.tape-inner {
   width: 100%;
-  max-width: 42ch;
+  max-width: 46ch;
+  margin-inline: auto;
 }
 
+/* Each entry is a ruled row: the question, then its answer set against the
+   right edge, the way the device stacks them. */
 .hist-row {
   display: grid;
-  gap: 1px;
+  gap: 2px;
   justify-items: start;
+  padding: 9px 0 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.hist-row:last-child {
+  border-bottom: 0;
 }
 
 .hist-in {
-  color: var(--muted);
-  font-size: 1.05rem;
+  color: #8b97a6;
+  font-size: 1.02rem;
 }
 
 .hist-out {
   align-self: end;
   justify-self: end;
-  font-size: 1.3rem;
+  font-size: 1.42rem;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
+  color: #f2f5f9;
 }
 
 .hist-out[data-error="true"] {
   color: var(--rose);
   font-family: var(--font-mono);
-  font-size: 0.86rem;
-  letter-spacing: 0.08em;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.09em;
 }
 
-.entry-line {
+/* The entry line is docked to the foot of the panel and lit slightly, so it
+   always reads as the live line. */
+.entry-dock {
+  flex: none;
+  padding: 11px 16px 13px;
+  background: linear-gradient(
+    180deg,
+    rgba(126, 182, 245, 0.045) 0%,
+    rgba(126, 182, 245, 0.1) 100%
+  );
+  box-shadow:
+    0 -1px 0 rgba(0, 0, 0, 0.6),
+    0 -2px 0 rgba(255, 255, 255, 0.055),
+    0 -14px 22px -14px rgba(96, 160, 230, 0.16);
+  z-index: 1;
+}
+
+/* Shares the tape's measure so the prompt lines up with the column above. */
+.entry-dock-inner {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  padding-top: 4px;
+  gap: 10px;
+  width: 100%;
+  max-width: 46ch;
+  margin-inline: auto;
 }
 
-.entry-caretmark {
+.entry-prompt {
+  flex: none;
   color: var(--amber);
   font-family: var(--font-mono);
   font-size: 0.9rem;
-  flex: none;
+  font-weight: 600;
+  line-height: 1;
+  text-shadow: 0 0 10px rgba(245, 172, 84, 0.45);
 }
 
 .entry-scroll {
@@ -548,7 +640,7 @@ button {
   display: none;
 }
 
-.entry-line .math {
+.entry-dock .math {
   font-size: 1.5rem;
 }
 
@@ -655,15 +747,16 @@ button {
   position: sticky;
   top: -14px;
   z-index: 1;
-  padding: 6px 10px;
+  padding: 6px 10px 7px;
   text-align: right;
   font-weight: 600;
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
-  background: var(--ink);
-  border-bottom: 1px solid var(--line);
+  /* opaque, so rows scrolling under it stay hidden */
+  background: #0a121c;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .table td {
@@ -1243,6 +1336,11 @@ button {
 
 /* --- misc ---------------------------------------------------------------- */
 
+.stat-hint {
+  color: var(--faint);
+  margin-left: 10px;
+}
+
 .stat-report {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -1416,6 +1514,13 @@ kbd {
   .quickstart-note { display: none; }
   /* A third of a phone screen holds two examples, not four. */
   .quickstart-list li:nth-child(n + 3) { display: none; }
+
+  .tape { padding: 11px 13px 4px; }
+  .entry-dock { padding: 9px 13px 11px; }
+  .entry-dock .math { font-size: 1.32rem; }
+  .hist-out { font-size: 1.25rem; }
+  .screen-head { padding: 8px 12px 7px; letter-spacing: 0.14em; }
+  .screen-status { gap: 8px; }
 
   .keypad[data-mod="2nd"] .key:has(.key-2nd) .key-face,
   .keypad[data-mod="alpha"] .key:has(.key-alpha) .key-face,

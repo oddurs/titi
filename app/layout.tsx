@@ -1,16 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo, Epilogue, IBM_Plex_Mono } from "next/font/google";
+import { Barlow, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 
-const ui = Archivo({
+/**
+ * Two typographic worlds, the way a real instrument has them: the hardware is
+ * lettered in one face, the display in another.
+ *
+ * Barlow is the hardware — a low-contrast grotesque from the signage and
+ * licence-plate lineage. It is slightly narrow, which is what lets "stat plot"
+ * sit on a keycap without shrinking.
+ *
+ * The screen is set in IBM Plex: a family drawn for machines, with unambiguous
+ * glyphs, a true italic for variables, and a monospace cut that shares its
+ * skeleton for coordinates and tables.
+ */
+const ui = Barlow({
   variable: "--font-ui",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
 
-// Math is set in a grotesque with a genuinely drawn italic, so variables read
-// as variables without falling back to a serif.
-const math = Epilogue({
+const math = IBM_Plex_Sans({
   variable: "--font-math",
   subsets: ["latin"],
   style: ["normal", "italic"],
@@ -30,7 +40,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#070a10",
+  themeColor: "#08090b",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

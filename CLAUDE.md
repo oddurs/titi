@@ -52,6 +52,11 @@ Keep it that way; two-dimensional editing is not worth the complexity.
 commits. `row` is a cursor on list screens but a scroll offset on the table —
 reset it when entering the table.
 
+**The home screen is a `.pane-stack`, not a `.pane`.** A scrolling `.tape`
+above a fixed `.entry-dock`. Both centre on the same `46ch` measure, so the
+prompt lines up with the column above it — change one, change both. Every other
+screen still uses the absolutely positioned `.pane`.
+
 ## TI behaviours the engine reproduces deliberately
 
 Do not "fix" these — they are tested:
@@ -75,6 +80,14 @@ will silently win on mobile.
 Material rules: one light source above and slightly left; every surface declares
 its plane (stage < shell < plate < key; shell > well > screen). Blue and green
 are reserved for `2ND` and `ALPHA` state and must not be used decoratively.
+
+The screen is an edge-lit panel: `.screen` stays dark and even, and the lamp is
+a short falloff on `.screen-body::before`. Do not put a large glow on `.screen`
+itself — it fogs the whole field.
+
+Three type roles: `--font-ui` (Barlow) is hardware lettering, `--font-math`
+(IBM Plex Sans) is screen content, `--font-mono` (IBM Plex Mono) is readouts
+and tables. Hardware and screen are deliberately different faces.
 
 ## Verifying UI work
 

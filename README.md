@@ -90,6 +90,16 @@ sit on: the keypad plate and display well are milled into the shell, keycaps are
 raised out of apertures in the plate. The body is warm graphite; the screen is
 cool ink. Hardware is tactile, and everything on the screen stays flat.
 
+The display is an edge-lit panel — a header band across the top, the field
+below it, and the entry line docked at the foot so the caret never scrolls
+away. On the home screen, entries accumulate upward as a ruled tape.
+
+Two typographic worlds, the way a real instrument has them. The hardware is
+lettered in Barlow, a low-contrast grotesque from the signage lineage, narrow
+enough to fit `stat plot` on a keycap. The screen is set in IBM Plex — drawn
+for machines, with unambiguous glyphs, a true italic for variables, and a
+monospace cut sharing its skeleton for coordinates and tables.
+
 Blue means `2ND` and green means `ALPHA`, and those two colours appear nowhere
 else — so a glance at the keypad always answers what a key will do right now.
 Arming a modifier promotes its labels onto the caps and dims the keys it does

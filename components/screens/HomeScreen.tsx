@@ -5,8 +5,9 @@ import MathText, { AnswerText } from "@/components/MathText";
 import { useCalc } from "@/lib/calc/store";
 
 /**
- * The blank home screen is the first thing anyone sees, so it does real work:
- * each line is a live expression that loads into the entry line when tapped.
+ * The home screen is a tape: entries accumulate upward from an entry line
+ * docked at the foot of the panel. The dock never scrolls away, so the caret
+ * stays where you left it no matter how long the tape gets.
  */
 const EXAMPLES: { expr: string; note: string }[] = [
   { expr: "2+2×√(9)", note: "order of operations" },
@@ -46,52 +47,56 @@ export default function HomeScreen() {
   const insertMode = useCalc((s) => s.insertMode);
   const report = useCalc((s) => s.statReport);
   const graphPrompt = useCalc((s) => s.graphPrompt);
-  const bottom = useRef<HTMLDivElement>(null);
+  const tape = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "end" });
-  }, [history.length, entry.text, report]);
+    const el = tape.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [history.length, report]);
 
   return (
-    <div className="pane" data-anchor="bottom">
-      <div className="history">
-        {history.length === 0 && !report && <QuickStart />}
+    <div className="pane-stack">
+      <div className="tape" ref={tape}>
+        <div className="tape-inner">
+          {history.length === 0 && !report && <QuickStart />}
 
-        {history.map((h) => (
-          <div className="hist-row" key={h.id}>
-            <div className="hist-in">
-              <MathText text={h.input} />
-            </div>
-            <div className="hist-out" data-error={h.isError}>
-              {h.isError ? h.output : <AnswerText value={h.output} />}
-            </div>
-          </div>
-        ))}
-
-        {report && (
-          <div className="stat-report">
-            <h3>{report.title}</h3>
-            {report.rows.map((r) => (
-              <div key={r.label} style={{ display: "contents" }}>
-                <span className="stat-key">{r.label}</span>
-                <span className="stat-val">
-                  {r.value}
-                  {r.hint && (
-                    <span style={{ color: "var(--faint)", marginLeft: 10 }}>{r.hint}</span>
-                  )}
-                </span>
+          {history.map((h) => (
+            <div className="hist-row" key={h.id}>
+              <div className="hist-in">
+                <MathText text={h.input} />
               </div>
-            ))}
-          </div>
-        )}
+              <div className="hist-out" data-error={h.isError}>
+                {h.isError ? h.output : <AnswerText value={h.output} />}
+              </div>
+            </div>
+          ))}
 
-        <div className="entry-line">
-          <span className="entry-caretmark">{graphPrompt?.op === "value" ? "x =" : "▸"}</span>
+          {report && (
+            <div className="stat-report">
+              <h3>{report.title}</h3>
+              {report.rows.map((r) => (
+                <div key={r.label} style={{ display: "contents" }}>
+                  <span className="stat-key">{r.label}</span>
+                  <span className="stat-val">
+                    {r.value}
+                    {r.hint && <span className="stat-hint">{r.hint}</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="entry-dock">
+        <div className="entry-dock-inner">
+          <span className="entry-prompt">
+            {graphPrompt?.op === "value" ? "x =" : "▸"}
+          </span>
           <div className="entry-scroll">
             <MathText text={entry.text} caret={entry.caret} overwrite={!insertMode} />
           </div>
         </div>
-        <div ref={bottom} />
       </div>
     </div>
   );

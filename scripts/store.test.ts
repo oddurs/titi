@@ -1,5 +1,6 @@
 import { describe, eq, near, ok, reportIfMain } from "./harness";
 import { device } from "./device";
+import { evaluate, makeEnv } from "../lib/math/eval";
 
 /**
  * What a keypress does.
@@ -312,6 +313,104 @@ describe("reset");
   eq("clears the tape", d.get().history.length, 0);
   eq("clears the functions", d.get().ys[0].expr, "");
   eq("and says so", d.get().message, "RAM cleared");
+}
+
+describe("2nd entry walks back through the stack");
+{
+  const d = device().type("1+1").press("enter").type("2+2").press("enter").type("3+3").press("enter");
+  d.press("2nd entry");
+  eq("the first press recalls the last input", d.get().entry.text, "3+3");
+  d.press("2nd entry");
+  eq("the second goes one further back", d.get().entry.text, "2+2");
+  d.press("2nd entry");
+  eq("and the third further still", d.get().entry.text, "1+1");
+  d.press("2nd entry");
+  eq("then it wraps", d.get().entry.text, "3+3");
+}
+{
+  const d = device().type("5").press("enter").type("6").press("enter");
+  d.press("2nd entry").press("2nd entry");
+  eq("having walked back", d.get().entry.text, "5");
+  d.press("enter").press("2nd entry");
+  eq("committing starts the walk over", d.get().entry.text, "5");
+}
+{
+  const d = device().type("9").press("enter").type("9").press("enter");
+  d.press("2nd entry").press("2nd entry");
+  eq("a repeated input is only in the stack once", d.get().entry.text, "9");
+}
+{
+  const d = device().press("2nd entry");
+  eq("with nothing entered it does nothing", d.get().entry.text, "");
+}
+
+describe("the angle menu");
+{
+  const d = device().press("2nd angle").press("enter");
+  eq("the first item inserts a degree mark", d.get().entry.text, "°");
+}
+{
+  // 45.51° as sexagesimal, read off the tape.
+  const d = device().type("45.51").press("2nd angle").repeat("down", 4).press("enter");
+  const last = d.get().history[d.get().history.length - 1];
+  eq("▸DMS converts the answer", last.output, "45°30′36″");
+  eq("and records what was asked", last.input, "45.51▸DMS");
+}
+{
+  // ▸DMS is a display format on a number of degrees, not a conversion — so
+  // reaching it from radians means saying so, with the radian mark.
+  const d = device()
+    .press("mode").repeat("down", 3).press("right").press("2nd quit")
+    .type("1").press("2nd angle").repeat("down", 3).press("enter")
+    .press("2nd angle").repeat("down", 4).press("enter");
+  eq("a radian marked angle converts on the way in",
+    d.get().history[d.get().history.length - 1].output, "57°17′44.806″");
+}
+
+/** A regression is only useful if Y₁ can be evaluated again afterwards. */
+function evaluates(expr: string): boolean {
+  const env = makeEnv();
+  env.vars.X = 1;
+  try {
+    return Number.isFinite(evaluate(expr, env) as number);
+  } catch {
+    return false;
+  }
+}
+
+describe("the new regressions from the keypad");
+{
+  // A logistic sample in L₁/L₂, fitted through the STAT CALC tab.
+  const xs = [0, 1, 2, 3, 4, 5, 6];
+  const ys = xs.map((x) => 100 / (1 + 50 * Math.exp(-1.2 * x)));
+  let d = device().press("stat").press("enter");
+  for (const x of xs) d = d.type(String(x)).press("enter");
+  d = d.press("right");
+  for (const y of ys) d = d.type(y.toFixed(4)).press("enter");
+  d = d.press("2nd quit").press("stat").press("right").repeat("down", 7).press("enter");
+
+  const report = d.get().statReport;
+  ok("a report comes back", report !== null);
+  ok("titled as a logistic", (report?.title ?? "").startsWith("Logistic"));
+  ok("and the fit lands in Y₁", d.get().ys[0].expr.includes("e^("));
+  ok("switched on, ready to graph", d.get().ys[0].on);
+}
+{
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let i = 0; i < 24; i++) { xs.push(i * 0.3); ys.push(2 * Math.sin(1.5 * i * 0.3) + 1); }
+  let d = device().press("stat").press("enter");
+  for (const x of xs) d = d.type(x.toFixed(3)).press("enter");
+  d = d.press("right");
+  for (const y of ys) d = d.type(y.toFixed(4)).press("enter");
+  d = d.press("2nd quit").press("stat").press("right").repeat("down", 8).press("enter");
+  ok("SinReg reports too", (d.get().statReport?.title ?? "").startsWith("SinReg"));
+  // The amplitude comes back as 1.99999… from four-decimal data, so match the
+  // shape and the value rather than the exact digits.
+  const expr = d.get().ys[0].expr;
+  ok("and writes a sine into Y₁", /sin\(/.test(expr), expr);
+  near("with the amplitude it was given", Number(expr.slice(0, expr.indexOf("sin("))), 2, 1e-4);
+  ok("which the engine can read back", evaluates(expr));
 }
 
 reportIfMain(import.meta.url);

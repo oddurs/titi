@@ -131,6 +131,25 @@ export function formatTick(x: number, step: number): string {
  * ▸Frac — continued-fraction expansion, rejecting denominators the device
  * would not show (TI caps at 3-digit denominators).
  */
+/**
+ * Degrees as sexagesimal: 45.51 -> 45°30′36″.
+ *
+ * Seconds carry up to three decimals and lose the trailing zeros; rounding
+ * them can fill a minute, so the carry runs upwards before anything is
+ * written out.
+ */
+export function toDMS(x: number): string {
+  const sign = x < 0 ? "-" : "";
+  const total = Math.abs(x);
+  let deg = Math.floor(total);
+  let min = Math.floor((total - deg) * 60);
+  let sec = Math.round(((total - deg) * 60 - min) * 60 * 1000) / 1000;
+  if (sec >= 60) { sec -= 60; min += 1; }
+  if (min >= 60) { min -= 60; deg += 1; }
+  const secText = String(sec).replace(/^0\./, ".");
+  return `${sign}${deg}°${min}′${secText}″`;
+}
+
 export function toFraction(
   x: number,
   maxDen = 9999,

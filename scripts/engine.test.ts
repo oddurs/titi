@@ -1,6 +1,6 @@
 import { describe, eq, reportIfMain } from "./harness";
 import { evaluate, makeEnv, CalcError } from "../lib/math/eval";
-import { formatValue, toFraction } from "../lib/math/format";
+import { formatValue, toDMS, toFraction } from "../lib/math/format";
 
 const env = makeEnv();
 const opts = { notation: "normal" as const, decimals: -1 };
@@ -114,5 +114,31 @@ check("Y₁", "ERR: UNDEFINED", () => { env.ys = {}; });
 describe("transpose and brackets do not disturb scalars");
 check("2[[1,2][3,4]]", "[2 4][6 8]");
 check("5-2", "3");
+
+describe("degrees, minutes and seconds");
+const toDeg = () => { env.angle = "deg"; };
+const toRad = () => { env.angle = "rad"; };
+check("45°", "45", toDeg);
+check("1°30′36″", "1.51");
+check("30′", ".5");
+check("36″", ".01");
+check("180°", "3.141592654", toRad);
+check("πʳ", "180", toDeg);
+check("1ʳ", "1", toRad);
+check("sin(30°)", ".5");
+check("30°+30°", "1.047197551");
+
+describe("▸DMS");
+eq("45.51 in sexagesimal", toDMS(45.51), "45°30′36″");
+eq("a whole degree", toDMS(30), "30°0′0″");
+eq("rounding seconds carries into minutes", toDMS(1 - 1 / 7200), "0°59′59.5″");
+eq("negatives keep the sign on the degrees", toDMS(-1.5), "-1°30′0″");
+
+describe("polar and rectangular conversions");
+check("R▸Pr(3,4)", "5", toDeg);
+check("R▸Pθ(1,1)", "45");
+check("P▸Rx(2,60)", "1");
+check("P▸Ry(2,90)", "2", toDeg);
+check("R▸Pθ(1,1)", ".7853981634", toRad);
 
 reportIfMain(import.meta.url);

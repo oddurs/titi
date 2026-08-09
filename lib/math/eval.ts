@@ -484,6 +484,16 @@ export function compile(node: Node): Fn {
             map1(e(env), (x) =>
               x < 0 && Number.isInteger(x) ? fail(env, "ERR: DOMAIN") : gammaFn(x + 1),
             );
+        // The angle marks read a number in one unit and hand back the same
+        // angle in whatever unit the device is set to.
+        case "°":
+          return (env) => map1(e(env), (x) => (env.angle === "deg" ? x : (x * Math.PI) / 180));
+        case "′":
+          return (env) => map1(e(env), (x) => (env.angle === "deg" ? x / 60 : (x * Math.PI) / 10800));
+        case "″":
+          return (env) => map1(e(env), (x) => (env.angle === "deg" ? x / 3600 : (x * Math.PI) / 648000));
+        case "ʳ":
+          return (env) => map1(e(env), (x) => (env.angle === "rad" ? x : (x * 180) / Math.PI));
         default: return e;
       }
     }
@@ -625,6 +635,25 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
     map1(a[0](env), (x) => f(x, env));
 
   /**
+   * An inverse circular function: the same escape rules as s1c, but the answer
+   * is an angle, so both branches leave radians for the display unit.
+   */
+  const s1a = (
+    real: (x: number) => number,
+    complexFn: (z: Complex) => Complex,
+    escapes: (x: number) => boolean = () => false,
+  ): Fn => (env) => {
+    const scale = env.angle === "deg" ? 180 / Math.PI : 1;
+    const v = a[0](env);
+    if (isComplex(v)) return asVal(C.mul(complexFn(v), C.cx(scale)));
+    if (typeof v === "number" && escapes(v)) {
+      if (env.complex !== "a+bi") return fail(env, "ERR: DOMAIN");
+      return asVal(C.mul(complexFn(C.cx(v)), C.cx(scale)));
+    }
+    return map1(v, (x) => (escapes(x) ? fail(env, "ERR: DOMAIN") : fromRad(env, real(x))));
+  };
+
+  /**
    * A function that has a complex continuation. The real path runs unless the
    * argument is already complex, or the real input leaves the reals and the
    * mode allows following it.
@@ -659,15 +688,40 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
           return Math.abs(s) < 1e-15 ? 0 : s / c;
         });
       };
-    case "asin": return s1((x, env) => (Math.abs(x) > 1 ? fail(env, "ERR: DOMAIN") : fromRad(env, Math.asin(x))));
-    case "acos": return s1((x, env) => (Math.abs(x) > 1 ? fail(env, "ERR: DOMAIN") : fromRad(env, Math.acos(x))));
-    case "atan": return s1((x, env) => fromRad(env, Math.atan(x)));
+    // The inverse circular functions answer in the angle unit, and so does
+    // their complex continuation — the device shows sin⁻¹(2) as 90-75.456i in
+    // degree mode, not the radian pair.
+    case "asin": return s1a(Math.asin, C.asin, (x) => Math.abs(x) > 1);
+    case "acos": return s1a(Math.acos, C.acos, (x) => Math.abs(x) > 1);
+    case "atan": return s1a(Math.atan, C.atan);
     case "sinh": return s1c(Math.sinh, C.sinh);
     case "cosh": return s1c(Math.cosh, C.cosh);
     case "tanh": return s1c(Math.tanh, C.tanh);
-    case "asinh": return s1(Math.asinh);
-    case "acosh": return s1((x, env) => (x < 1 ? fail(env, "ERR: DOMAIN") : Math.acosh(x)));
-    case "atanh": return s1((x, env) => (Math.abs(x) >= 1 ? fail(env, "ERR: DOMAIN") : Math.atanh(x)));
+    // The inverse hyperbolics are pure numbers — no angle unit is involved.
+    case "asinh": return s1c(Math.asinh, C.asinh);
+    case "acosh":
+      return s1c(
+        (x, env) => (x < 1 ? fail(env, "ERR: DOMAIN") : Math.acosh(x)),
+        C.acosh,
+        (x) => x < 1,
+      );
+    case "atanh":
+      return s1c(
+        (x, env) => (Math.abs(x) >= 1 ? fail(env, "ERR: DOMAIN") : Math.atanh(x)),
+        C.atanh,
+        (x) => Math.abs(x) >= 1,
+      );
+
+    // R▸Pr( and friends: the angle argument and result follow the angle mode,
+    // the lengths never do.
+    case "rectToR":
+      return (env) => map2(a[0](env), a[1](env), (x, y) => Math.hypot(x, y));
+    case "rectToTheta":
+      return (env) => map2(a[0](env), a[1](env), (x, y) => fromRad(env, Math.atan2(y, x)));
+    case "polarToX":
+      return (env) => map2(a[0](env), a[1](env), (r, t) => snapTrig(r * Math.cos(toRad(env, t))));
+    case "polarToY":
+      return (env) => map2(a[0](env), a[1](env), (r, t) => snapTrig(r * Math.sin(toRad(env, t))));
 
     case "log":
       if (a.length === 2) {

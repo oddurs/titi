@@ -250,6 +250,37 @@
       "-8"
     ]
   },
+  "graph-drawn": {
+    "digest": "be3d9d30",
+    "transcript": [
+      "GRAPH RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8"
+    ]
+  },
+  "graph-drawing-prompt": {
+    "digest": "186dd96e",
+    "transcript": [
+      "GRAPH RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8",
+      "Move to one end, then press e"
+    ]
+  },
   "stat-lists": {
     "digest": "f9111758",
     "transcript": [
@@ -261,7 +292,7 @@
     ]
   },
   "stat-report": {
-    "digest": "2ae361e0",
+    "digest": "567cde56",
     "transcript": [
       "HOME RAD",
       "1‑Var Stats",
@@ -272,11 +303,56 @@
       "σx=1.632993162",
       "n=3",
       "minX=2",
-      "Q₁=3",
+      "Q₁=2",
       "Med=4",
-      "Q₃=5",
+      "Q₃=6",
       "maxX=6",
       ">"
+    ]
+  },
+  "graph-histogram": {
+    "digest": "e88329f2",
+    "transcript": [
+      "GRAPH RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8"
+    ]
+  },
+  "graph-boxplot": {
+    "digest": "9c4e2b24",
+    "transcript": [
+      "GRAPH RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8"
+    ]
+  },
+  "graph-scatter": {
+    "digest": "899ea34c",
+    "transcript": [
+      "GRAPH RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8"
     ]
   },
   "matrix-editor": {

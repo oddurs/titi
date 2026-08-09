@@ -25,6 +25,7 @@ const ARITY: Record<string, [number, number]> = {
   augment: [2, 2], dim: [1, 1], Fill: [2, 2], randM: [2, 2],
   matr2list: [2, 2], list2matr: [1, 9],
   real: [1, 1], imag: [1, 1], angle: [1, 1], "@seq": [2, 2],
+  rectToR: [2, 2], rectToTheta: [2, 2], polarToX: [2, 2], polarToY: [2, 2],
   normalpdf: [1, 3], normalcdf: [2, 4], invNorm: [1, 3],
   binompdf: [2, 3], binomcdf: [2, 3], solve: [2, 4],
 };
@@ -181,7 +182,9 @@ class Parser {
       const t = this.peek();
       if (t && t.kind === "postfix") {
         this.next();
-        e = { t: "post", op: t.value, e };
+        // 1°2′3″ is one angle, not three factors, so the minutes and seconds
+        // are folded in here rather than left to implicit multiplication.
+        e = t.value === "°" ? { t: "post", op: "°", e: this.dmsTail(e) } : { t: "post", op: t.value, e };
       } else if (t && t.kind === "fn" && t.value === "xroot") {
         // ˣ√( — index precedes the radical: 3ˣ√(8)
         this.next();
@@ -190,6 +193,28 @@ class Parser {
         e = { t: "call", name: "xroot", args: [e, arg] };
       } else return e;
     }
+  }
+
+  /**
+   * After a `°`, absorb any `m′` and `s″` that follow, as degrees.
+   * The device only accepts literal numbers in those places, and so does this.
+   */
+  private dmsTail(deg: Node): Node {
+    let e = deg;
+    for (const [mark, per] of [["′", 60], ["″", 3600]] as const) {
+      const num = this.peek();
+      const unit = this.toks[this.i + 1];
+      if (!num || num.kind !== "num") break;
+      if (!unit || unit.kind !== "postfix" || unit.value !== mark) break;
+      this.i += 2;
+      e = {
+        t: "bin",
+        op: "+",
+        l: e,
+        r: { t: "bin", op: "/", l: { t: "num", v: Number(num.value), raw: num.text }, r: { t: "num", v: per, raw: String(per) } },
+      };
+    }
+    return e;
   }
 
   private closeParen() {

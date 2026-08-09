@@ -26,8 +26,8 @@ const d = device().press("y=").press("X,T,θ,n").press("x²").press("enter");
 eq("commits the slot", d.get().ys[0].expr, "X²");
 ```
 
-Keys are addressed by the label printed on them, and `"2nd calc"` arms the
-modifier first — so a case reads as the sequence a person performs. Reach for
+Keys are addressed by the label printed on them, and `"2nd calc"` (or
+`"alpha E"`) arms the modifier first — so a case reads as the sequence a person performs. Reach for
 `type("7/8")` for runs of digits and operators.
 
 `scripts/panel.ts` renders a screen through a recording context. The display
@@ -124,6 +124,17 @@ three term functions before any of them runs, so a definition can reference
 itself or the others. Each term walks from nMin filling a cache, which is what
 keeps a recursive definition linear instead of exponential.
 
+**Drawings sit above the curves and are never saved.** `state.drawings` holds
+what DRAW put on the glass. They outlive a redraw but not `ClrDraw`, and they
+are left out of `persistence.ts` on purpose — a drawing is placed in graph
+units against a particular window, so restoring one into a different window
+puts it somewhere it was never put.
+
+**A menu closes before its action runs.** `chooseMenuItem` clears `menu` and
+then dispatches, so an action that means to stay open (stepping a stat plot's
+list, say) reads `menuBeforeAction` — the menu it was chosen from, live only
+for that turn.
+
 **Graph modes reinterpret the same six Y slots.** `lib/calc/curves.ts` turns
 them into parameterised curves; the plotter, trace and ZoomFit all consume that
 rather than reading slots directly. Add a mode there, not in `Plot.tsx`.
@@ -155,6 +166,11 @@ Do not "fix" these — they are tested:
 - A bare trailing `Y` or `L` is a variable, not `Y₁`/`L₁` — the subscript must
   actually be present (`"".includes()` is true for every string, which is how
   that bug got in)
+- Q₁ and Q₃ split the sorted list at the median and take the median of each
+  half, dropping the middle value when the count is odd — not the interpolated
+  quantile, which would put Q₁ of 1,2,3,4,5 at 2 rather than 1.5
+- `▸DMS` is a display format on a number of degrees, not a conversion; reaching
+  it from radians means writing the `ʳ` mark
 
 ## The display
 

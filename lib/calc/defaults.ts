@@ -53,8 +53,11 @@ export function freshYs(): YFunction[] {
 }
 
 export function freshPlots(): StatPlot[] {
+  // Three, like the device — box plots in particular are meant to stack.
   return [
     { on: false, type: "scatter", xList: "L₁", yList: "L₂", color: 1, mark: "cross" },
+    { on: false, type: "scatter", xList: "L₃", yList: "L₄", color: 2, mark: "box" },
+    { on: false, type: "scatter", xList: "L₅", yList: "L₆", color: 3, mark: "dot" },
   ];
 }
 

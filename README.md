@@ -60,19 +60,41 @@ equation editor that will solve for any variable in it.
 
 **Complex numbers.** `MODE` switches between Real and `a+bi`. In Real mode
 `√(-1)` is an error, as it is on the device; in `a+bi` it is `i`, and the
-arithmetic, roots, logs, exponentials and hyperbolics all follow. `abs(`
-returns the modulus, and `conj(`, `real(`, `imag(` and `angle(` do what they
-say.
+arithmetic, roots, logs, exponentials, hyperbolics and the inverse trig all
+follow — `sin⁻¹(2)` and `tanh⁻¹(2)` answer instead of erroring, on the
+principal branch. `abs(` returns the modulus, and `conj(`, `real(`, `imag(`
+and `angle(` do what they say.
 
-**Statistics.** A six-list editor, 1-Var and 2-Var stats, and five regressions —
-`LinReg(ax+b)`, `QuadReg`, `ExpReg`, `LnReg` and `PwrReg` — each writing its fit
-back into `Y₁`. Scatter and xyLine stat plots. Normal and binomial
-distributions under `DISTR`.
+**Angles.** `ANGLE` carries the `°`, `′`, `″` and `ʳ` marks, so `1°30′36″` is
+one angle whatever the mode is set to, and `▸DMS` reads a number of degrees
+back out as sexagesimal. `R▸Pr(`, `R▸Pθ(`, `P▸Rx(` and `P▸Ry(` convert between
+rectangular and polar.
+
+**Statistics.** A six-list editor, 1-Var and 2-Var stats, and seven
+regressions — `LinReg(ax+b)`, `QuadReg`, `ExpReg`, `LnReg`, `PwrReg`,
+`Logistic` and `SinReg` — each writing its fit back into `Y₁`. The last two
+have no closed form, so they search: the logistic over its ceiling and the
+sinusoid over its frequency, with an exact linear fit inside each step. Three
+stat plots, each a scatter, xyLine, histogram or box plot over any pair of
+lists. Quartiles follow the device's median-of-halves rule rather than the
+interpolated quantile. Normal and binomial distributions under `DISTR`.
+
+**Drawing.** `DRAW` puts `Line(`, `Horizontal`, `Vertical`, `Circle(`,
+`Text(`, `Pt‑On(` and `Pt‑Off(` on the graph. Each waits for you to place its
+points — arrows move a free cursor, `ENTER` sets one — and `ClrDraw` takes it
+all back off.
 
 **Tables and modes.** `TABLE` with `TBLSET`, and `MODE` for Normal/Sci/Eng,
 Float/Fix, Radian/Degree, Connected/Dot, grid, labels and coordinates.
 
-Your functions, window, lists and modes persist in `localStorage`.
+`2nd ENTRY` walks back through what you have typed, one entry per press, and
+wraps at the end.
+
+Your functions, window, lists and modes persist in `localStorage`, under a
+schema version — a save from an older build is migrated, and a field that no
+longer validates is replaced on its own rather than costing you the rest.
+Drawings are deliberately not saved: a drawing belongs to the window it was
+made in.
 
 ### Keyboard
 
@@ -104,7 +126,7 @@ lib/
     solver.ts        equation solving over the root finder
     program.ts       the suspendable TI-BASIC interpreter
     format.ts        ten-significant-digit display, ▸Frac
-    stats.ts         1-Var, 2-Var, and five regressions
+    stats.ts         1-Var, 2-Var, quartiles, and seven regressions
   calc/
     store.ts         editing, navigation, menus, dispatch
     graphing.ts      window, ZOOM, CALC, TRACE

@@ -2,7 +2,7 @@
 
 import { create, type StateCreator } from "zustand";
 import { CalcError, clearYCache, evaluate, makeEnv, type Env } from "../math/eval";
-import { formatMatrixRows, formatNumber, formatValue, toFraction } from "../math/format";
+import { formatMatrixRows, formatNumber, formatValue, toDMS, toFraction } from "../math/format";
 import { isMatrix } from "../math/matrix";
 import { nextBoundary, prevBoundary } from "../math/lexer";
 import { keyById } from "./keys";
@@ -39,6 +39,7 @@ import { SAMPLE_PROGRAMS, type ProgramSource } from "../math/program";
 import { createPrograms } from "./programs";
 import type {
   CalcMark,
+  Drawing,
   EditTarget,
   Entry,
   GraphWindow,
@@ -85,6 +86,12 @@ export interface CalcState {
    * appending, which is how typing over WINDOW or a matrix cell behaves.
    */
   entryFresh: boolean;
+  /**
+   * How far back 2nd ENTRY has walked, or -1 when it has not been pressed
+   * since the last commit. The TI keeps a stack of previous inputs and steps
+   * one further back on each press, wrapping at the end.
+   */
+  entryIndex: number;
   target: EditTarget;
   history: HistoryItem[];
   ys: YFunction[];
@@ -94,6 +101,8 @@ export interface CalcState {
   menu: MenuState | null;
   trace: TraceState | null;
   marks: CalcMark[];
+  /** what the user drew on the graph by hand; see the type for why it is not saved */
+  drawings: Drawing[];
   plots: StatPlot[];
   lists: number[][];
   mats: Record<string, Matrix>;
@@ -114,7 +123,13 @@ export interface CalcState {
   onEquals: boolean;
   /** free-moving cursor on the graph when not tracing */
   cursor: { x: number; y: number } | null;
-  graphPrompt: { op: string; stage: number; lower?: number } | null;
+  graphPrompt: {
+    op: string;
+    stage: number;
+    lower?: number;
+    /** the first point of a two-point DRAW command */
+    point?: { x: number; y: number };
+  } | null;
   message: string | null;
   statReport: StatReport | null;
   /** bumped whenever the plot needs a redraw */
@@ -245,10 +260,18 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     set({
       history: [...get().history, item].slice(-80),
       entry: { text: "", caret: 0 },
+      // The next ENTRY starts from the top again.
+      entryIndex: -1,
     });
     // A store into a Y-variable should be reflected in the editor list.
     syncEnv();
     persist();
+  }
+
+  /** What a plot is set to, for the toast that follows an edit. */
+  function plotSummary(p: StatPlot, slot: number): string {
+    const lists = p.type === "hist" || p.type === "box" ? p.xList : `${p.xList},${p.yList}`;
+    return `Plot${slot + 1} ${p.type} ${lists} ${p.mark}`;
   }
 
   /** null means unparseable; undefined means the field was left blank. */
@@ -578,6 +601,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
   const {
     applyZoom, runCalc, resolveGraphPrompt,
     startTrace, stepTrace, switchTraceFn,
+    startDraw, nudgeCursor,
   } = graphing;
 
   const { runStat, runSolve } = createReports({
@@ -677,6 +701,9 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     const m = st.menu;
     if (!m) return;
     const item = m.tabs[m.tab].items[m.index];
+    // The menu closes before the action runs, so an action that wants to stay
+    // open — stepping a plot's list, say — needs the state it closed from.
+    menuBeforeAction = m;
     set({ menu: null });
     if (!item) return;
     if (item.insert) {
@@ -687,7 +714,11 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       return;
     }
     if (item.action) runAction(item.action);
+    menuBeforeAction = null;
   }
+
+  /** The menu an action was chosen from, live only for that action's turn. */
+  let menuBeforeAction: MenuState | null = null;
 
   // -- action dispatch ------------------------------------------------------
 
@@ -719,13 +750,37 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         return;
       }
       case "plot": {
+        // plot:<what>:<index>[:<value>] — every setting names its plot, since
+        // the menu tab the user is standing in is the only other clue.
+        const parts = action.split(":");
+        const slot = Number(parts[2]);
+        const value = parts[3];
+        const LISTS = ["L₁", "L₂", "L₃", "L₄", "L₅", "L₆"];
+        const MARKS: StatPlot["mark"][] = ["box", "cross", "dot"];
+        const step = <T,>(all: T[], cur: T): T => all[(all.indexOf(cur) + 1) % all.length];
+
         const plots = st.plots.map((p, i) => {
-          if (arg === "toggle" && i === Number(arg2)) return { ...p, on: !p.on };
-          if (arg === "type") return { ...p, on: true, type: arg2 as StatPlot["type"] };
           if (arg === "off") return { ...p, on: false };
-          return p;
+          if (i !== slot) return p;
+          switch (arg) {
+            case "toggle": return { ...p, on: !p.on };
+            case "type": return { ...p, on: true, type: value as StatPlot["type"] };
+            case "xlist": return { ...p, xList: step(LISTS, p.xList) };
+            case "ylist": return { ...p, yList: step(LISTS, p.yList) };
+            case "mark": return { ...p, mark: step(MARKS, p.mark) };
+            default: return p;
+          }
         });
-        set({ plots, screen: "graph", revision: st.revision + 1 });
+        // Choosing a list or a mark is editing the plot, not asking to see it;
+        // only the switches and the types leave for the graph.
+        const staying = arg === "xlist" || arg === "ylist" || arg === "mark";
+        set({
+          plots,
+          menu: staying ? menuBeforeAction : null,
+          screen: staying ? st.screen : "graph",
+          message: staying ? plotSummary(plots[slot], slot) : null,
+          revision: st.revision + 1,
+        });
         persist();
         return;
       }
@@ -748,7 +803,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       }
 
       case "draw":
-        set({ marks: [], graphPrompt: null, revision: st.revision + 1, message: null });
+        startDraw(arg);
         return;
       case "home":
         set({ history: [], statReport: null });
@@ -814,6 +869,26 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         return;
       }
 
+      case "toDMS": {
+        const { ok } = evalEntry();
+        const raw = ok ? env.ans : null;
+        if (typeof raw !== "number") return note("ERR: DATA TYPE");
+        set({
+          history: [
+            ...st.history,
+            {
+              id: st.history.length + 1,
+              input: `${st.entry.text.trim() || formatNumber(raw, fmt())}▸DMS`,
+              output: toDMS(raw),
+              isError: false,
+            },
+          ],
+          entry: { text: "", caret: 0 },
+          screen: "home",
+        });
+        return;
+      }
+
       case "recall": {
         const last = st.history[st.history.length - 1];
         if (last) insert(last.output);
@@ -821,8 +896,17 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       }
 
       case "lastEntry": {
-        const last = st.history[st.history.length - 1];
-        if (last) setEntry(last.input);
+        // The stack is the inputs, most recent first, without the immediate
+        // repeats that would make a press look like it did nothing.
+        const stack: string[] = [];
+        for (let i = st.history.length - 1; i >= 0 && stack.length < 10; i--) {
+          const src = st.history[i].input;
+          if (src && src !== stack[stack.length - 1]) stack.push(src);
+        }
+        if (!stack.length) return;
+        const next = (st.entryIndex + 1) % stack.length;
+        setEntry(stack[next]);
+        set({ entryIndex: next });
         return;
       }
 
@@ -940,6 +1024,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
           return set({ row: clamp(st.row + dir, 0, MODE_ROWS.length - 1) });
         }
         if (st.screen === "graph") {
+          if (nudgeCursor(0, -dir)) return;
           if (st.trace) return void switchTraceFn(dir);
           const step = (st.win.ymax - st.win.ymin) / 20;
           return set({
@@ -970,6 +1055,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
           return;
         }
         if (st.screen === "graph") {
+          if (nudgeCursor(dir, 0)) return;
           if (stepTrace(dir)) return;
           const step = (st.win.xmax - st.win.xmin) / 20;
           return set({
@@ -998,6 +1084,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
           screen: "home",
           history: [],
           entry: { text: "", caret: 0 },
+          entryIndex: -1,
           target: { kind: "home" },
           ys: freshYs(),
           win: { ...STANDARD_WINDOW },
@@ -1036,6 +1123,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     insertMode: true,
     entry: { text: "", caret: 0 },
     entryFresh: false,
+    entryIndex: -1,
     target: { kind: "home" },
     history: [],
     ys: freshYs(),
@@ -1045,6 +1133,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     menu: null,
     trace: null,
     marks: [],
+    drawings: [],
     plots: freshPlots(),
     lists: Array.from({ length: 6 }, () => [] as number[]),
     mats: { "[A]": MX.identity(2) },

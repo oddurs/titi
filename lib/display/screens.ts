@@ -102,6 +102,7 @@ export function renderScreen(pen: Pen, s: CalcState): HitRegion[] {
     case "graph":
       renderGraph(pen, {
         win: s.win, ys: s.ys, modes: s.modes, marks: s.marks, trace: s.trace,
+        drawings: s.drawings, cursor: s.graphPrompt ? s.cursor : null,
         plots: s.plots, lists: s.lists, env: s.env, top,
       });
       renderGraphStrip(pen, s);
@@ -133,6 +134,7 @@ export function renderScreen(pen: Pen, s: CalcState): HitRegion[] {
 function renderGraphStrip(pen: Pen, s: CalcState) {
   const parts = graphReadout({
     win: s.win, ys: s.ys, modes: s.modes, marks: s.marks, trace: s.trace,
+    drawings: s.drawings, cursor: s.cursor,
     plots: s.plots, lists: s.lists, env: s.env, top: 0,
   });
   const mark = s.marks[0];

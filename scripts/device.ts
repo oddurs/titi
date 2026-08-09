@@ -33,7 +33,10 @@ for (const [alias, id] of [
 
 export interface Device {
   get(): CalcState;
-  /** Press keys in order, by label or id. Prefix with `2nd ` for the blue function. */
+  /**
+   * Press keys in order, by label or id. Prefix with `2nd ` or `alpha ` to
+   * arm that modifier first.
+   */
   press(...keys: string[]): Device;
   /** Press a key n times. */
   repeat(key: string, n: number): Device;
@@ -59,11 +62,13 @@ export function device(): Device {
   const store = createCalcStore();
 
   const hit = (key: string) => {
-    // "2nd x" arms the modifier first, the way a person would.
-    if (key.startsWith("2nd ")) {
-      store.getState().press("2nd");
-      hit(key.slice(4));
-      return;
+    // "2nd x" and "alpha x" arm the modifier first, the way a person would.
+    for (const mod of ["2nd", "alpha"]) {
+      if (key.startsWith(`${mod} `)) {
+        store.getState().press(mod);
+        hit(key.slice(mod.length + 1));
+        return;
+      }
     }
     const id = BY_LABEL.get(key);
     if (!id) throw new Error(`no key labelled ${JSON.stringify(key)}`);

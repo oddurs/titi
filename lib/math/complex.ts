@@ -116,6 +116,47 @@ export const cosh = (a: Complex): Complex => ({
 
 export const tanh = (a: Complex): Complex => div(sinh(a), cosh(a));
 
+/**
+ * The inverse circular and hyperbolic functions.
+ *
+ * Each is written from the logarithm rather than derived from the others, so
+ * the branch cuts land where the principal value wants them: asin and acos cut
+ * along the real axis outside [-1, 1], atan along the imaginary axis outside
+ * (-i, i), and acosh uses the √(z+1)√(z-1) form rather than √(z²-1), which
+ * picks the wrong sheet to the left of -1.
+ */
+const I: Complex = { re: 0, im: 1 };
+const ONE: Complex = { re: 1, im: 0 };
+
+export function asin(a: Complex): Complex {
+  // -i ln(iz + √(1 - z²))
+  const r = sqrt(sub(ONE, mul(a, a)));
+  return mul(neg(I), log(add(mul(I, a), r)));
+}
+
+export function acos(a: Complex): Complex {
+  // π/2 - asin(z), which keeps the two consistent at the cuts
+  return sub({ re: Math.PI / 2, im: 0 }, asin(a));
+}
+
+export function atan(a: Complex): Complex {
+  // (i/2)(ln(1 - iz) - ln(1 + iz))
+  const iz = mul(I, a);
+  return mul({ re: 0, im: 0.5 }, sub(log(sub(ONE, iz)), log(add(ONE, iz))));
+}
+
+export function asinh(a: Complex): Complex {
+  return log(add(a, sqrt(add(mul(a, a), ONE))));
+}
+
+export function acosh(a: Complex): Complex {
+  return log(add(a, mul(sqrt(add(a, ONE)), sqrt(sub(a, ONE)))));
+}
+
+export function atanh(a: Complex): Complex {
+  return mul({ re: 0.5, im: 0 }, sub(log(add(ONE, a)), log(sub(ONE, a))));
+}
+
 /** log base b, for the two-argument form of log(. */
 export const logBase = (a: Complex, b: Complex): Complex => div(log(a), log(b));
 

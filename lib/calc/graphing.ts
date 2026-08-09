@@ -2,7 +2,7 @@ import { sampler, type Env } from "../math/eval";
 import { buildCurves, paramRange } from "./curves";
 import { clamp, STANDARD_WINDOW } from "./defaults";
 import { findExtremum, findIntersection, findZeroNear } from "./analysis";
-import type { CalcMark, YFunction } from "./types";
+import type { CalcMark, Drawing, YFunction } from "./types";
 import type { CalcState } from "./store";
 
 /**
@@ -152,6 +152,118 @@ function applyZoom(kind: string) {
   persist();
 }
 
+// -- DRAW operations ------------------------------------------------------
+
+/** How many points each command needs before it can be drawn. */
+const DRAW_POINTS: Record<string, number> = {
+  line: 2, circle: 2, horizontal: 1, vertical: 1, pton: 1, ptoff: 1, text: 1,
+};
+
+const DRAW_PROMPT: Record<string, [string, string]> = {
+  line: ["Move to one end, then press enter", "Move to the other end, then press enter"],
+  circle: ["Move to the centre, then press enter", "Move out to the rim, then press enter"],
+  horizontal: ["Move to the height, then press enter", ""],
+  vertical: ["Move across, then press enter", ""],
+  pton: ["Move to the point, then press enter", ""],
+  ptoff: ["Move to the point to erase, then press enter", ""],
+  text: ["Move to where the text goes, then press enter", "Type the text, then press enter"],
+};
+
+/** Where the free cursor should start when a draw command is chosen. */
+function centreCursor() {
+  const { win, cursor } = get();
+  return cursor ?? { x: (win.xmin + win.xmax) / 2, y: (win.ymin + win.ymax) / 2 };
+}
+
+function startDraw(op: string) {
+  if (op === "clear") {
+    set({ drawings: [], marks: [], menu: null, screen: "graph", graphPrompt: null, revision: get().revision + 1 });
+    note("Drawings cleared");
+    return;
+  }
+  if (!DRAW_POINTS[op]) return;
+  set({
+    screen: "graph",
+    menu: null,
+    trace: null,
+    cursor: centreCursor(),
+    graphPrompt: { op: `draw:${op}`, stage: 0 },
+  });
+  note(DRAW_PROMPT[op][0]);
+}
+
+/**
+ * Arrows drive the free cursor while a draw command is waiting for a point,
+ * rather than panning the window. A hundred steps across the field is fine by
+ * hand and the pointer is there when it is not.
+ */
+function nudgeCursor(dx: number, dy: number): boolean {
+  const st = get();
+  if (!st.graphPrompt?.op.startsWith("draw:")) return false;
+  if (st.graphPrompt.stage === 1 && st.graphPrompt.op === "draw:text") return false;
+  const c = st.cursor ?? centreCursor();
+  const w = st.win;
+  set({
+    cursor: {
+      x: clamp(c.x + (dx * (w.xmax - w.xmin)) / 100, w.xmin, w.xmax),
+      y: clamp(c.y + (dy * (w.ymax - w.ymin)) / 100, w.ymin, w.ymax),
+    },
+    revision: st.revision + 1,
+  });
+  return true;
+}
+
+/** ENTER during a draw command: place a point, or finish. */
+function resolveDraw(op: string, stage: number): boolean {
+  const st = get();
+  const c = st.cursor ?? centreCursor();
+  const add = (d: Drawing) => {
+    set({
+      drawings: [...st.drawings, d],
+      graphPrompt: null,
+      cursor: c,
+      message: null,
+      entry: { text: "", caret: 0 },
+      revision: st.revision + 1,
+    });
+  };
+
+  if (op === "text" && stage === 1) {
+    const label = st.entry.text.trim();
+    const at = st.graphPrompt?.point ?? c;
+    if (!label) {
+      set({ graphPrompt: null, entry: { text: "", caret: 0 } });
+      note(null);
+      return true;
+    }
+    add({ kind: "text", x: at.x, y: at.y, label });
+    return true;
+  }
+
+  if (DRAW_POINTS[op] === 2 && stage === 0) {
+    set({ graphPrompt: { op: `draw:${op}`, stage: 1, point: c } });
+    note(DRAW_PROMPT[op][1]);
+    return true;
+  }
+
+  if (op === "text") {
+    set({ graphPrompt: { op: "draw:text", stage: 1, point: c }, entry: { text: "", caret: 0 } });
+    note(DRAW_PROMPT.text[1]);
+    return true;
+  }
+
+  const first = st.graphPrompt?.point ?? c;
+  switch (op) {
+    case "line": add({ kind: "line", x: first.x, y: first.y, x2: c.x, y2: c.y }); break;
+    case "circle": add({ kind: "circle", x: first.x, y: first.y, x2: c.x, y2: c.y }); break;
+    case "horizontal": add({ kind: "hline", x: c.x, y: c.y }); break;
+    case "vertical": add({ kind: "vline", x: c.x, y: c.y }); break;
+    case "pton": add({ kind: "point", x: c.x, y: c.y }); break;
+    case "ptoff": add({ kind: "point", x: c.x, y: c.y, erase: true }); break;
+  }
+  return true;
+}
+
 // -- CALC operations ------------------------------------------------------
 
 function currentTraceFn(): number {
@@ -236,6 +348,7 @@ function resolveGraphPrompt() {
   const st = get();
   const p = st.graphPrompt;
   if (!p) return false;
+  if (p.op.startsWith("draw:")) return resolveDraw(p.op.slice(5), p.stage);
   const idx = currentTraceFn();
   const f = idx >= 0 ? makeSampler(idx) : null;
 
@@ -345,6 +458,8 @@ function switchTraceFn(dir: number) {
   return {
     enabledYs,
     makeSampler,
+    startDraw,
+    nudgeCursor,
     applyZoom,
     currentTraceFn,
     runCalc,

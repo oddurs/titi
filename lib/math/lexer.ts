@@ -89,6 +89,10 @@ export const FUNCTIONS = [
   "real(",
   "imag(",
   "angle(",
+  "R▸Pr(",
+  "R▸Pθ(",
+  "P▸Rx(",
+  "P▸Ry(",
 ] as const;
 
 const FN_CANON: Record<string, string> = {
@@ -106,6 +110,10 @@ const FN_CANON: Record<string, string> = {
   "stdDev(": "stdDev",
   "Matr▸list(": "matr2list",
   "List▸matr(": "list2matr",
+  "R▸Pr(": "rectToR",
+  "R▸Pθ(": "rectToTheta",
+  "P▸Rx(": "polarToX",
+  "P▸Ry(": "polarToY",
 };
 
 /** Two-character postfix / operator glyphs and misc singles. */
@@ -119,6 +127,10 @@ const OPERATORS = [
   "²",
   "³",
   "!",
+  "°",
+  "′",
+  "″",
+  "ʳ",
   "+",
   "-",
   "−",
@@ -132,7 +144,7 @@ const OPERATORS = [
   ">",
 ] as const;
 
-const POSTFIX = new Set(["⁻¹", "²", "³", "!", "ᵀ"]);
+const POSTFIX = new Set(["⁻¹", "²", "³", "!", "ᵀ", "°", "′", "″", "ʳ"]);
 
 const CONSTS: Record<string, string> = {
   "π": "pi",

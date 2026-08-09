@@ -206,6 +206,17 @@ export class Pen {
     this.ctx.restore();
   }
 
+  /**
+   * Take ink away. On a one-bit panel there is no such thing as drawing in
+   * the background colour, so Pt-Off has to knock the dots out.
+   */
+  erase(x: number, y: number, w: number, h: number) {
+    this.ctx.save();
+    this.ctx.globalCompositeOperation = "destination-out";
+    this.fill(x, y, w, h, "#000");
+    this.ctx.restore();
+  }
+
   /** A filled block, used for the entry cursor. */
   cursor(col: number, row: number, ink: Ink = INK.accent) {
     this.fill(col * CHAR_W, row * CHAR_H - 1, CHAR_W - 1, CHAR_H - 1, ink);

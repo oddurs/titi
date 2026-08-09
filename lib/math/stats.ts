@@ -15,6 +15,39 @@ import { formatNumber } from "./format";
 
 const f = (x: number) => formatNumber(x, { notation: "normal", decimals: -1 });
 
+/** The middle value of an already sorted list. */
+export function median(sorted: number[]): number {
+  const n = sorted.length;
+  if (!n) return NaN;
+  const m = n >> 1;
+  return n % 2 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
+}
+
+/**
+ * The five-number summary.
+ *
+ * The device splits the sorted list at the median and takes the median of each
+ * half, dropping the middle value when the count is odd — not the interpolated
+ * quantile most libraries reach for, which puts Q₁ of 1,2,3,4,5 at 2 rather
+ * than 1.5. The box plot and 1-Var Stats both read from here so they agree.
+ */
+export function quartiles(l: number[]): {
+  min: number; q1: number; med: number; q3: number; max: number;
+} {
+  const s = [...l].sort((a, b) => a - b);
+  const n = s.length;
+  if (!n) return { min: NaN, q1: NaN, med: NaN, q3: NaN, max: NaN };
+  if (n === 1) return { min: s[0], q1: s[0], med: s[0], q3: s[0], max: s[0] };
+  const m = n >> 1;
+  return {
+    min: s[0],
+    q1: median(s.slice(0, m)),
+    med: median(s),
+    q3: median(n % 2 ? s.slice(m + 1) : s.slice(m)),
+    max: s[n - 1],
+  };
+}
+
 export function oneVarStats(l: number[]): StatReport {
   const n = l.length;
   const sum = l.reduce((s, x) => s + x, 0);
@@ -22,13 +55,7 @@ export function oneVarStats(l: number[]): StatReport {
   const mean = sum / n;
   const ssd = n > 1 ? Math.sqrt((sum2 - (sum * sum) / n) / (n - 1)) : 0;
   const psd = Math.sqrt(sum2 / n - mean * mean);
-  const sorted = [...l].sort((a, b) => a - b);
-  const q = (p: number) => {
-    const idx = p * (sorted.length - 1);
-    const lo = Math.floor(idx);
-    const hi = Math.ceil(idx);
-    return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
-  };
+  const five = quartiles(l);
 
   return {
     title: "1‑Var Stats",
@@ -39,11 +66,11 @@ export function oneVarStats(l: number[]): StatReport {
       { label: "Sx", value: f(ssd), hint: "sample sd" },
       { label: "σx", value: f(psd), hint: "population sd" },
       { label: "n", value: f(n) },
-      { label: "minX", value: f(sorted[0]) },
-      { label: "Q₁", value: f(q(0.25)) },
-      { label: "Med", value: f(q(0.5)) },
-      { label: "Q₃", value: f(q(0.75)) },
-      { label: "maxX", value: f(sorted[sorted.length - 1]) },
+      { label: "minX", value: f(five.min) },
+      { label: "Q₁", value: f(five.q1) },
+      { label: "Med", value: f(five.med) },
+      { label: "Q₃", value: f(five.q3) },
+      { label: "maxX", value: f(five.max) },
     ],
   };
 }
@@ -230,6 +257,188 @@ export function quadReg(xs: number[], ys: number[]): StatReport {
       { label: "b", value: f(b) },
       { label: "c", value: f(c) },
       { label: "R²", value: f(ssTot === 0 ? 1 : 1 - ssRes / ssTot) },
+      { label: "→", value: "Y₁", hint: "stored" },
+    ],
+    expr,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The two regressions with no closed form.
+//
+// Both reduce to a search over one awkward parameter with an exact linear fit
+// inside: for a fixed frequency a sinusoid is linear in its coefficients, and
+// for a fixed ceiling a logistic straightens into a line. That keeps the
+// search one-dimensional, which is what makes it reliable without needing the
+// iteration count the device asks for.
+// ---------------------------------------------------------------------------
+
+/** Solve a small symmetric normal-equation system by Gaussian elimination. */
+function solveLinear(m: number[][], rhs: number[]): number[] | null {
+  const n = rhs.length;
+  const a = m.map((row, i) => [...row, rhs[i]]);
+  for (let c = 0; c < n; c++) {
+    let pivot = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(a[r][c]) > Math.abs(a[pivot][c])) pivot = r;
+    if (Math.abs(a[pivot][c]) < 1e-12) return null;
+    [a[c], a[pivot]] = [a[pivot], a[c]];
+    for (let r = 0; r < n; r++) {
+      if (r === c) continue;
+      const k = a[r][c] / a[c][c];
+      for (let j = c; j <= n; j++) a[r][j] -= k * a[c][j];
+    }
+  }
+  return a.map((row, i) => row[n] / a[i][i]);
+}
+
+/** Least squares for y ≈ A·sin(bx) + B·cos(bx) + D at a fixed b. */
+function sinusoidAt(xs: number[], ys: number[], b: number) {
+  const basis = xs.map((x) => [Math.sin(b * x), Math.cos(b * x), 1]);
+  const m = [0, 1, 2].map((i) => [0, 1, 2].map((j) =>
+    basis.reduce((s, row) => s + row[i] * row[j], 0)));
+  const rhs = [0, 1, 2].map((i) => basis.reduce((s, row, k) => s + row[i] * ys[k], 0));
+  const c = solveLinear(m, rhs);
+  if (!c) return null;
+  const sse = ys.reduce((s, y, k) => {
+    const p = c[0] * basis[k][0] + c[1] * basis[k][1] + c[2];
+    return s + (y - p) * (y - p);
+  }, 0);
+  return { A: c[0], B: c[1], D: c[2], sse };
+}
+
+/**
+ * SinReg  y = a sin(bx + c) + d
+ *
+ * The frequency is swept across everything the sample can resolve — one full
+ * period over the whole span at the low end, two samples per period at the
+ * high end — then the best is refined by bisecting around it. Any narrower a
+ * sweep and a slow wave gets fitted as a fast one aliased down.
+ */
+export function sinReg(xs: number[], ys: number[]): StatReport {
+  const n = xs.length;
+  if (n < 4) throw new Error("ERR: DIM MISMATCH");
+  const lo = Math.min(...xs);
+  const hi = Math.max(...xs);
+  const span = hi - lo;
+  if (span <= 0) throw new Error("ERR: DOMAIN");
+
+  const sorted = [...xs].sort((p, q) => p - q);
+  const gaps = sorted.slice(1).map((x, i) => x - sorted[i]).filter((g) => g > 0);
+  const finest = Math.max(span / (n * 4), gaps.length ? Math.min(...gaps) : span / n);
+  const bMin = (2 * Math.PI) / (span * 1.5);
+  const bMax = Math.PI / finest;
+
+  let best: { b: number; fit: NonNullable<ReturnType<typeof sinusoidAt>> } | null = null;
+  const STEPS = 600;
+  for (let i = 0; i <= STEPS; i++) {
+    const b = bMin * Math.pow(bMax / bMin, i / STEPS);
+    const fit = sinusoidAt(xs, ys, b);
+    if (fit && (!best || fit.sse < best.fit.sse)) best = { b, fit };
+  }
+  if (!best) throw new Error("ERR: SINGULAR MAT");
+
+  // Refine: halve the bracket around the winner a few dozen times.
+  let width = best.b * (Math.pow(bMax / bMin, 1 / STEPS) - 1);
+  for (let k = 0; k < 40 && width > 1e-12; k++) {
+    const bracket: number[] = [best.b - width, best.b + width];
+    for (const candidate of bracket) {
+      if (candidate <= 0) continue;
+      const fit = sinusoidAt(xs, ys, candidate);
+      if (fit && fit.sse < best.fit.sse) best = { b: candidate, fit };
+    }
+    width /= 2;
+  }
+
+  const { A, B, D } = best.fit;
+  const b: number = best.b;
+  const a = Math.hypot(A, B);
+  // a sin(bx + c) = A sin(bx) + B cos(bx) with A = a cos c, B = a sin c
+  let c = Math.atan2(B, A);
+  if (c <= -Math.PI) c += 2 * Math.PI;
+
+  const expr = `${f(a)}sin(${f(b)}X+${f(c)})+${f(D)}`.split("+-").join("-");
+  return {
+    title: "SinReg  y = a sin(bx+c)+d",
+    rows: [
+      { label: "a", value: f(a), hint: "amplitude" },
+      { label: "b", value: f(b), hint: "2π ÷ period" },
+      { label: "c", value: f(c), hint: "phase" },
+      { label: "d", value: f(D), hint: "offset" },
+      { label: "→", value: "Y₁", hint: "stored" },
+    ],
+    expr,
+  };
+}
+
+/**
+ * LogisticReg  y = c / (1 + a·e^(-bx))
+ *
+ * Fix the ceiling and the curve straightens: ln(c/y - 1) is linear in x. So
+ * the ceiling is the only thing searched over, from just above the largest
+ * observation upwards, and the error is measured back in the original units
+ * rather than in the log — otherwise a huge ceiling always wins.
+ */
+export function logisticReg(xs: number[], ys: number[]): StatReport {
+  const n = xs.length;
+  if (n < 3) throw new Error("ERR: DIM MISMATCH");
+  if (ys.some((y) => y <= 0)) throw new Error("ERR: DOMAIN");
+  const yMax = Math.max(...ys);
+
+  const at = (c: number) => {
+    const u: number[] = [];
+    const v: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const t = c / ys[i] - 1;
+      if (t <= 0) return null;
+      u.push(xs[i]);
+      v.push(Math.log(t));
+    }
+    const su = u.reduce((s, x) => s + x, 0);
+    const sv = v.reduce((s, y) => s + y, 0);
+    const suv = u.reduce((s, x, i) => s + x * v[i], 0);
+    const su2 = u.reduce((s, x) => s + x * x, 0);
+    const denom = n * su2 - su * su;
+    if (Math.abs(denom) < 1e-12) return null;
+    const slope = (n * suv - su * sv) / denom;
+    const intercept = (sv - slope * su) / n;
+    const a = Math.exp(intercept);
+    const b = -slope;
+    const sse = ys.reduce((s, y, i) => {
+      const p = c / (1 + a * Math.exp(-b * xs[i]));
+      return s + (y - p) * (y - p);
+    }, 0);
+    return { a, b, c, sse };
+  };
+
+  let best: NonNullable<ReturnType<typeof at>> | null = null;
+  const STEPS = 400;
+  for (let i = 0; i <= STEPS; i++) {
+    // 1.001×max up to 20×max, geometrically — the useful ceilings are near
+    // the data, and the tail only needs sampling coarsely.
+    const c = yMax * (1.001 * Math.pow(20 / 1.001, i / STEPS));
+    const fit = at(c);
+    if (fit && (!best || fit.sse < best.sse)) best = fit;
+  }
+  if (!best) throw new Error("ERR: DOMAIN");
+
+  let width = best.c * 0.05;
+  for (let k = 0; k < 60 && width > 1e-9; k++) {
+    const bracket: number[] = [best.c - width, best.c + width];
+    for (const c of bracket) {
+      if (c <= yMax) continue;
+      const fit = at(c);
+      if (fit && fit.sse < best.sse) best = fit;
+    }
+    width /= 2;
+  }
+
+  const expr = `${f(best.c)}/(1+${f(best.a)}e^(${f(-best.b)}X))`.split("+-").join("-");
+  return {
+    title: "Logistic  y = c/(1+ae^(-bx))",
+    rows: [
+      { label: "a", value: f(best.a) },
+      { label: "b", value: f(best.b), hint: "growth rate" },
+      { label: "c", value: f(best.c), hint: "ceiling" },
       { label: "→", value: "Y₁", hint: "stored" },
     ],
     expr,

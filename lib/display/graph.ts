@@ -1,7 +1,10 @@
 import { formatNumber, formatTick } from "../math/format";
+import { quartiles } from "../math/stats";
 import { buildCurves, paramRange } from "../calc/curves";
 import { PLOT_COLORS } from "../calc/colors";
-import type { CalcMark, GraphWindow, Modes, StatPlot, TraceState, YFunction } from "../calc/types";
+import type {
+  CalcMark, Drawing, GraphWindow, Modes, StatPlot, TraceState, YFunction,
+} from "../calc/types";
 import type { Env } from "../math/eval";
 import { CHAR_H, CHAR_W, INK, Pen } from "./pen";
 
@@ -11,7 +14,10 @@ export interface GraphInput {
   ys: YFunction[];
   modes: Modes;
   marks: CalcMark[];
+  drawings: Drawing[];
   trace: TraceState | null;
+  /** the free cursor, shown while a DRAW command is waiting for a point */
+  cursor: { x: number; y: number } | null;
   plots: StatPlot[];
   lists: number[][];
   env: Env;
@@ -27,6 +33,35 @@ export interface GraphInput {
 const GRID_INK = "#24405c";
 const AXIS_INK = "#7ba5cc";
 const LABEL_INK = "#a8c6e4";
+
+/** L₁…L₆ by name; anything unrecognised reads as empty rather than throwing. */
+function listByName(lists: number[][], name: string): number[] {
+  const i = "₁₂₃₄₅₆".indexOf(name.slice(-1));
+  return i >= 0 ? (lists[i] ?? []) : [];
+}
+
+/** The three mark shapes the device offers for a scatter. */
+function drawMark(
+  pen: Pen,
+  x: number,
+  y: number,
+  mark: StatPlot["mark"],
+  ink: string,
+) {
+  if (mark === "dot") {
+    pen.dot(x, y, ink);
+    return;
+  }
+  if (mark === "box") {
+    pen.hline(x - 1, x + 1, y - 1, ink);
+    pen.hline(x - 1, x + 1, y + 1, ink);
+    pen.vline(x - 1, y - 1, y + 1, ink);
+    pen.vline(x + 1, y - 1, y + 1, ink);
+    return;
+  }
+  pen.hline(x - 1, x + 1, y, ink);
+  pen.vline(x, y - 1, y + 1, ink);
+}
 
 function niceStep(range: number, targetCount: number): number {
   const raw = range / Math.max(1, targetCount);
@@ -86,22 +121,71 @@ export function renderGraph(pen: Pen, g: GraphInput) {
   }
 
   // -- stat plots -----------------------------------------------------------
+  // Box plots share the top of the field, one band each, so three of them can
+  // be read against one another the way the device stacks them.
+  let boxSlot = 0;
+
   for (const p of g.plots) {
     if (!p.on) continue;
-    const xs = g.lists[0];
-    const ys = g.lists[1];
-    const n = Math.min(xs.length, ys.length);
+    const xs = listByName(g.lists, p.xList);
     const ink = PLOT_COLORS[p.color % PLOT_COLORS.length];
+    if (!xs.length) continue;
+
+    if (p.type === "hist") {
+      // Xscl is the bin width, and the bars are counted from Xmin — the same
+      // rule the device uses, which is why a bad Xscl gives a bad histogram
+      // there too.
+      const width = win.xscl > 0 ? win.xscl : niceStep(spanX, 10);
+      const bins = Math.min(200, Math.ceil(spanX / width));
+      const counts = new Array<number>(bins).fill(0);
+      for (const v of xs) {
+        const k = Math.floor((v - win.xmin) / width);
+        if (k >= 0 && k < bins) counts[k] += 1;
+      }
+      const base = Math.round(py(Math.max(0, win.ymin)));
+      for (let k = 0; k < bins; k++) {
+        if (!counts[k]) continue;
+        const left = Math.round(px(win.xmin + k * width));
+        const right = Math.round(px(win.xmin + (k + 1) * width));
+        const topY = Math.round(py(counts[k]));
+        pen.vline(left, Math.min(topY, base), Math.max(topY, base), ink);
+        pen.vline(right, Math.min(topY, base), Math.max(topY, base), ink);
+        pen.hline(left, right, topY, ink);
+      }
+      continue;
+    }
+
+    if (p.type === "box") {
+      const band = Math.max(9, Math.floor(h / 8));
+      const mid = top + Math.round(band * (boxSlot + 0.5));
+      boxSlot += 1;
+      const half = Math.max(2, Math.floor(band / 3));
+      const five = quartiles(xs);
+      const [x0, x1, x2, x3, x4] = [five.min, five.q1, five.med, five.q3, five.max]
+        .map((v) => Math.round(px(v)));
+      // whiskers
+      pen.hline(x0, x1, mid, ink);
+      pen.hline(x3, x4, mid, ink);
+      pen.vline(x0, mid - half + 1, mid + half - 1, ink);
+      pen.vline(x4, mid - half + 1, mid + half - 1, ink);
+      // the box, with the median across it
+      pen.hline(x1, x3, mid - half, ink);
+      pen.hline(x1, x3, mid + half, ink);
+      pen.vline(x1, mid - half, mid + half, ink);
+      pen.vline(x3, mid - half, mid + half, ink);
+      pen.vline(x2, mid - half, mid + half, ink);
+      continue;
+    }
+
+    const ys = listByName(g.lists, p.yList);
+    const n = Math.min(xs.length, ys.length);
     if (p.type === "line") {
       for (let i = 1; i < n; i++) {
         pen.line(px(xs[i - 1]), py(ys[i - 1]), px(xs[i]), py(ys[i]), ink);
       }
     }
     for (let i = 0; i < n; i++) {
-      const cx = Math.round(px(xs[i]));
-      const cy = Math.round(py(ys[i]));
-      pen.hline(cx - 1, cx + 1, cy, ink);
-      pen.vline(cx, cy - 1, cy + 1, ink);
+      drawMark(pen, Math.round(px(xs[i])), Math.round(py(ys[i])), p.mark, ink);
     }
   }
 
@@ -198,6 +282,59 @@ export function renderGraph(pen: Pen, g: GraphInput) {
     pen.dottedV(mx, top, top + h - 1, 2, ink);
     pen.dottedH(0, w - 1, my, 2, ink);
     pen.fill(mx - 1, my - 1, 3, 3, ink);
+  }
+
+  // -- drawings -------------------------------------------------------------
+  // Above the curves, because a drawing is the last thing put on the glass.
+  for (const d of g.drawings) {
+    const x = Math.round(px(d.x));
+    const y = Math.round(py(d.y));
+    switch (d.kind) {
+      case "line":
+        pen.line(x, y, Math.round(px(d.x2 ?? d.x)), Math.round(py(d.y2 ?? d.y)), INK.on);
+        break;
+      case "hline":
+        pen.hline(0, w - 1, y, INK.on);
+        break;
+      case "vline":
+        pen.vline(x, top, top + h - 1, INK.on);
+        break;
+      case "circle": {
+        // The radius is set in graph units and drawn in dots, so a window that
+        // is not square gives an ellipse — which is what the device does too.
+        const rx = Math.abs(px(d.x2 ?? d.x) - x);
+        const ry = Math.abs(py(d.y2 ?? d.y) - y);
+        const r = Math.hypot(rx, ry);
+        if (r < 0.5) break;
+        const steps = Math.max(24, Math.round(r * 6));
+        let prev: [number, number] | null = null;
+        for (let i = 0; i <= steps; i++) {
+          const t = (i / steps) * Math.PI * 2;
+          const p: [number, number] = [
+            Math.round(x + r * Math.cos(t)),
+            Math.round(y + r * Math.sin(t)),
+          ];
+          if (prev) pen.line(prev[0], prev[1], p[0], p[1], INK.on);
+          prev = p;
+        }
+        break;
+      }
+      case "point":
+        if (d.erase) pen.erase(x - 1, y - 1, 3, 3);
+        else pen.fill(x - 1, y - 1, 3, 3, INK.on);
+        break;
+      case "text":
+        if (d.label) pen.text(Math.round(x / CHAR_W), Math.round(y / CHAR_H), d.label, INK.on);
+        break;
+    }
+  }
+
+  // -- the free cursor, while a DRAW command is placing a point -------------
+  if (g.cursor && !g.trace) {
+    const cx = Math.round(px(g.cursor.x));
+    const cy = Math.round(py(g.cursor.y));
+    pen.hline(cx - 3, cx + 3, cy, INK.accent);
+    pen.vline(cx, cy - 3, cy + 3, INK.accent);
   }
 
   // -- trace cursor ---------------------------------------------------------

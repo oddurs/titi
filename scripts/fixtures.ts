@@ -7,6 +7,13 @@ import { device, type Device } from "./device";
  * randomness, no clock — because a golden that drifts on its own teaches
  * everyone to ignore it.
  */
+/** L₁ filled by hand, the way a person would, then back to the home screen. */
+function withList(values: number[]): Device {
+  let d = device().press("stat").press("enter");
+  for (const v of values) d = d.type(String(v)).press("enter");
+  return d.press("2nd quit");
+}
+
 export const FIXTURES: Record<string, () => Device> = {
   "home-empty": () => device(),
 
@@ -94,6 +101,20 @@ export const FIXTURES: Record<string, () => Device> = {
       .press("enter").repeat("down", 2).type("1").press("enter")
       .press("graph"),
 
+  "graph-drawn": () =>
+    device()
+      .press("y=").press("X,T,θ,n").press("x²").press("sub").type("4").press("enter")
+      .press("graph")
+      .press("2nd draw").repeat("down", 4).press("enter")
+      .press("enter").repeat("right", 15).press("enter")
+      .press("2nd draw").repeat("down", 2).press("enter")
+      .repeat("up", 12).press("enter"),
+
+  "graph-drawing-prompt": () =>
+    device()
+      .press("y=").press("X,T,θ,n").press("enter").press("graph")
+      .press("2nd draw").press("down").press("enter"),
+
   "stat-lists": () =>
     device()
       .press("stat").press("enter")
@@ -104,6 +125,20 @@ export const FIXTURES: Record<string, () => Device> = {
       .press("stat").press("enter")
       .type("2").press("enter").type("4").press("enter").type("6").press("enter")
       .press("stat").press("right").press("enter"),
+
+  "graph-histogram": () =>
+    withList([1, 1, 2, 2, 2, 3, 5, 8])
+      .press("2nd stat plot").repeat("down", 3).press("enter"),
+
+  "graph-boxplot": () =>
+    withList([1, 2, 3, 4, 5, 6, 7, 12])
+      .press("2nd stat plot").repeat("down", 4).press("enter"),
+
+  "graph-scatter": () =>
+    withList([1, 2, 3, 4]).press("stat").press("enter").press("right")
+      .type("2").press("enter").type("5").press("enter")
+      .type("7").press("enter").type("11").press("enter")
+      .press("2nd quit").press("2nd stat plot").press("down").press("enter"),
 
   "matrix-editor": () =>
     device().press("2nd matrix").repeat("right", 2).press("enter"),

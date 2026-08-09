@@ -115,9 +115,31 @@ export interface CalcMark {
   fn: number;
 }
 
+/**
+ * Something the user put on the graph by hand.
+ *
+ * Drawings sit above the curves and outlive a redraw, but not ClrDraw — the
+ * same deal the device offers. They are deliberately not saved: a drawing is
+ * about the window it was made in, and restoring one into a different window
+ * would put it somewhere it was never placed.
+ */
+export interface Drawing {
+  kind: "line" | "hline" | "vline" | "circle" | "point" | "text";
+  x: number;
+  y: number;
+  /** the far end of a line, or a point on a circle's rim */
+  x2?: number;
+  y2?: number;
+  /** for text */
+  label?: string;
+  /** Pt-Off knocks a hole rather than adding ink */
+  erase?: boolean;
+}
+
 export interface StatPlot {
   on: boolean;
-  type: "scatter" | "line" | "hist";
+  /** hist and box read xList alone; scatter and line need both */
+  type: "scatter" | "line" | "hist" | "box";
   xList: string;
   yList: string;
   color: number;

@@ -66,9 +66,17 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
       {
         name: "angle",
         items: [
+          ins("°", "°", "degrees, whatever the mode"),
+          ins("′", "′", "minutes"),
+          ins("″", "″", "seconds"),
+          ins("ʳ", "ʳ", "radians, whatever the mode"),
+          act("▸DMS", "toDMS", "show the answer as degrees, minutes, seconds"),
+          ins("R▸Pr(", "R▸Pr(", "x, y to radius"),
+          ins("R▸Pθ(", "R▸Pθ(", "x, y to angle"),
+          ins("P▸Rx(", "P▸Rx(", "r, θ to x"),
+          ins("P▸Ry(", "P▸Ry(", "r, θ to y"),
           act("Radian", "angle:rad", "set angle mode"),
           act("Degree", "angle:deg", "set angle mode"),
-          ins("π", "π"),
         ],
       },
     ],
@@ -176,6 +184,8 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
           act("ExpReg", "stat:expreg", "y = ab^x"),
           act("LnReg", "stat:lnreg", "y = a + b ln x"),
           act("PwrReg", "stat:pwrreg", "y = ax^b"),
+          act("Logistic", "stat:logisticreg", "y = c/(1+ae^(-bx))"),
+          act("SinReg", "stat:sinreg", "y = a sin(bx+c)+d"),
         ],
       },
     ],
@@ -207,17 +217,22 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
 
   statplot: {
     title: "stat plots",
-    tabs: [
-      {
-        name: "plots",
-        items: [
-          act("Plot1 on/off", "plot:toggle:0", "scatter of L₁ vs L₂"),
-          act("Plot1 scatter", "plot:type:scatter"),
-          act("Plot1 xyLine", "plot:type:line"),
-          act("PlotsOff", "plot:off"),
-        ],
-      },
-    ],
+    // One tab per plot, because every setting on the device's plot editor
+    // belongs to a particular plot — there is no global "the plot".
+    tabs: [0, 1, 2].map((i) => ({
+      name: `plot${i + 1}`,
+      items: [
+        act("On/Off", `plot:toggle:${i}`, "draw this plot with the graph"),
+        act("Scatter", `plot:type:${i}:scatter`, "x list against y list"),
+        act("xyLine", `plot:type:${i}:line`, "the same, joined in order"),
+        act("Histogram", `plot:type:${i}:hist`, "x list, binned by Xscl"),
+        act("Boxplot", `plot:type:${i}:box`, "x list, five-number summary"),
+        act("Xlist ▸", `plot:xlist:${i}`, "step to the next list"),
+        act("Ylist ▸", `plot:ylist:${i}`, "step to the next list"),
+        act("Mark ▸", `plot:mark:${i}`, "box, cross or dot"),
+        act("PlotsOff", "plot:off", "switch all three off"),
+      ],
+    })),
   },
 
   draw: {
@@ -226,9 +241,21 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
       {
         name: "draw",
         items: [
-          act("ClrDraw", "draw:clear", "remove calc marks"),
-          act("Tangent", "calc:deriv", "draw tangent at cursor"),
-          act("Shade ∫", "calc:integral"),
+          act("ClrDraw", "draw:clear", "take everything drawn back off"),
+          act("Line(", "draw:line", "between two points"),
+          act("Horizontal", "draw:horizontal", "all the way across"),
+          act("Vertical", "draw:vertical", "all the way down"),
+          act("Circle(", "draw:circle", "centre, then a point on the rim"),
+          act("Text(", "draw:text", "a label where you put it"),
+          act("Pt‑On(", "draw:pton", "one dot"),
+          act("Pt‑Off(", "draw:ptoff", "take one dot away"),
+        ],
+      },
+      {
+        name: "on graph",
+        items: [
+          act("Tangent(", "calc:deriv", "the slope where you are"),
+          act("Shade ∫", "calc:integral", "the area between two limits"),
         ],
       },
     ],

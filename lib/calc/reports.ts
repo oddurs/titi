@@ -2,8 +2,8 @@ import { CalcError, type Env } from "../math/eval";
 import { solveEquation } from "../math/solver";
 import { solverRows } from "./layout";
 import {
-  expReg, linReg, lnReg, oneVarStats, pwrReg, quadReg, twoVarStats,
-  type StatReport,
+  expReg, linReg, lnReg, logisticReg, oneVarStats, pwrReg, quadReg, sinReg,
+  twoVarStats, type StatReport,
 } from "../math/stats";
 import type { EditTarget } from "./types";
 import type { CalcState } from "./store";
@@ -15,6 +15,8 @@ const REGRESSIONS: Record<string, (xs: number[], ys: number[]) => StatReport> = 
   expreg: expReg,
   lnreg: lnReg,
   pwrreg: pwrReg,
+  sinreg: sinReg,
+  logisticreg: logisticReg,
 };
 
 /**

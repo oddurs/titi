@@ -12,6 +12,12 @@ has the rest). What follows is our own restatement of the *behaviour* — the
 inventory of commands and what they do — written to be worked from, not read
 for pleasure.
 
+**On checking.** `scripts/manual.test.ts` runs the guidebook's own worked
+examples — an expression and the answer the device prints for it. Three of
+those printed answers are wrong in the ninth digit and ours are right, so that
+suite asserts the true values and says which they are. Where we deliberately do
+more than the device, the row says so rather than claiming conformance.
+
 **On status.** Four values, and they mean exactly this:
 
 | Status | Meaning |
@@ -67,7 +73,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | --- | --- | --- | --- |
 | `MATH ▸ MATH` | `▸Frac`, `▸Dec`, `x³`, `∛(`, `ˣ√(`, `fMin(`, `nDeriv(`, `fnInt(`, `solve(`, Solver | done | `lib/calc/menus.ts` |
 | `MATH ▸ NUM` | `abs(`, `round(`, `iPart(`, `fPart(`, `int(`, `min(`, `max(`, `lcm(`, `gcd(` | done | `lib/math/eval.ts` |
-| `MATH ▸ PRB` | `rand`, `nPr(`, `nCr(`, `!`, `randInt(`, `randNorm(` | done | `lib/math/eval.ts` |
+| `MATH ▸ PRB` | `rand`, `nPr`, `nCr`, `!`, `randInt(`, `randNorm(`, `randBin(`, `randIntNoRep(` — the two counters are written between their arguments, as on the device | done | `scripts/manual.test.ts` |
 | `MATH ▸ CPX` | The complex operations gathered where the device puts them | done | `lib/calc/menus.ts` |
 | `remainder(` | Two arguments, taking the sign of the divisor | done | `lib/math/eval.ts` |
 
@@ -184,8 +190,8 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | --- | --- | --- | --- |
 | `MODE` Real / `a+bi` | Real refuses to leave the reals, as the device does | done | `lib/math/eval.ts` |
 | Arithmetic, roots, logs, powers | — | done | `lib/math/complex.ts` |
-| Trig and hyperbolics | — | done | `lib/math/complex.ts` |
-| Inverse trig and hyperbolics | Principal branch, cuts where they belong | done | `scripts/complex.test.ts` |
+| Trig and hyperbolics | The guidebook says the trig functions do not take complex arguments; ours do, on the principal branch — a deliberate extension | done | `lib/math/complex.ts` |
+| Inverse trig and hyperbolics | Principal branch, cuts where they belong; also beyond the device | done | `scripts/complex.test.ts` |
 | `conj(` `real(` `imag(` `angle(` `abs(` | — | done | `lib/math/eval.ts` |
 | `re^θi` display mode | `a+bi` is the only complex display | out-of-scope | — |
 

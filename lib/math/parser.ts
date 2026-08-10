@@ -31,7 +31,7 @@ const ARITY: Record<string, [number, number]> = {
   poissonpdf: [2, 2], poissoncdf: [2, 2], geometpdf: [2, 2], geometcdf: [2, 2],
   tpdf: [2, 2], tcdf: [2, 3], invT: [2, 2],
   chi2pdf: [2, 2], chi2cdf: [2, 3], Fpdf: [3, 3], Fcdf: [3, 4],
-  nPr: [2, 2], nCr: [2, 2], randNorm: [0, 3],
+  randNorm: [0, 3], randBin: [2, 3], randIntNoRep: [2, 2],
   normalpdf: [1, 3], normalcdf: [2, 4], invNorm: [1, 3],
   binompdf: [2, 3], binomcdf: [2, 3], solve: [2, 4],
 };
@@ -130,16 +130,16 @@ class Parser {
   }
 
   private parseProduct(): Node {
-    let l = this.parseUnary();
+    let l = this.parseCombinatoric();
     for (;;) {
       if (this.at("op", "*")) {
         this.next();
-        l = { t: "bin", op: "*", l, r: this.parseUnary() };
+        l = { t: "bin", op: "*", l, r: this.parseCombinatoric() };
       } else if (this.at("op", "/")) {
         this.next();
-        l = { t: "bin", op: "/", l, r: this.parseUnary() };
+        l = { t: "bin", op: "/", l, r: this.parseCombinatoric() };
       } else if (this.startsImplicitFactor()) {
-        l = { t: "bin", op: "*", l, r: this.parseUnary(), implicit: true };
+        l = { t: "bin", op: "*", l, r: this.parseCombinatoric(), implicit: true };
       } else return l;
     }
   }
@@ -160,6 +160,19 @@ class Parser {
       t.kind === "lbracket" ||
       t.kind === "lparen"
     );
+  }
+
+  /**
+   * `5 nCr 2` — they sit between a product and a power, so 2*5 nCr 2 counts
+   * first and multiplies after, which is the order the device uses.
+   */
+  private parseCombinatoric(): Node {
+    let l = this.parseUnary();
+    while (this.peek()?.kind === "op" && (this.peek()!.value === "nPr" || this.peek()!.value === "nCr")) {
+      const op = this.next().value;
+      l = { t: "bin", op, l, r: this.parseUnary() };
+    }
+    return l;
   }
 
   private parseUnary(): Node {

@@ -252,12 +252,12 @@ check("1>2 or 2>1", "1");
 check("not(2>1)", "0");
 
 describe("counting");
-check("nPr(10,3)", "720", toRad);
-check("nCr(10,3)", "120");
-check("nCr(200,100)", "9.054851466ᴇ58");
-check("nCr(5,0)", "1");
-check("nCr(5,6)", "0");
-check("nPr(5,5)", "120");
+check("10 nPr 3", "720", toRad);
+check("10 nCr 3", "120");
+check("200 nCr 100", "9.054851466ᴇ58");
+check("5 nCr 0", "1");
+check("5 nCr 6", "0");
+check("5 nPr 5", "120");
 check("poissonpdf(3,2)", ".2240418077");
 check("geometcdf(.3,3)", ".657");
 check("χ²cdf(0,3.841458821,1)", ".95");

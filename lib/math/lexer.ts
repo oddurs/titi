@@ -102,9 +102,9 @@ export const FUNCTIONS = [
   "χ²cdf(",
   "Fpdf(",
   "Fcdf(",
-  "nPr(",
-  "nCr(",
   "randNorm(",
+  "randBin(",
+  "randIntNoRep(",
   "SortA(",
   "SortD(",
   "cumSum(",
@@ -234,6 +234,18 @@ export function lex(src: string): Token[] {
       }
     }
 
+    // Words that operate: nPr and nCr are written between their arguments,
+    // and the connectives join comparisons. All of them start with a letter,
+    // so they have to be found before `n` is taken as the sequence variable
+    // or a bare letter becomes a variable.
+    for (const word of ["and", "or", "xor", "nPr", "nCr"]) {
+      if (src.startsWith(word, i) && !VAR_CHARS.includes(src[i + word.length] ?? "")) {
+        push("op", word, word, i);
+        i += word.length;
+        continue outer;
+      }
+    }
+
     // Sequence names and their index variable.
     if (src.startsWith("nMin", i)) {
       push("var", "nMin", "nMin", i);
@@ -262,15 +274,6 @@ export function lex(src: string): Token[] {
       i += 3;
       continue;
     }
-    // The word connectives, before a bare letter can claim the first one.
-    for (const word of ["and", "or", "xor"]) {
-      if (src.startsWith(word, i) && !VAR_CHARS.includes(src[i + word.length] ?? "")) {
-        push("op", word, word, i);
-        i += word.length;
-        continue outer;
-      }
-    }
-
     if (src.startsWith("getKey", i)) {
       push("const", "getKey", "getKey", i);
       i += 6;

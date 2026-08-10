@@ -800,6 +800,10 @@ export function compile(node: Node): Fn {
         case ">": return (env) => map2(l(env), r(env), (a, b) => (a > b ? 1 : 0));
         case "≤": return (env) => map2(l(env), r(env), (a, b) => (a <= b ? 1 : 0));
         case "≥": return (env) => map2(l(env), r(env), (a, b) => (a >= b ? 1 : 0));
+        // Written between their arguments on the device — 5 nCr 2 — and they
+        // map over lists like any other two-argument operation.
+        case "nPr": return (env) => map2(l(env), r(env), nPr);
+        case "nCr": return (env) => map2(l(env), r(env), (a, b) => nCr(a, b));
         // The connectives take anything non-zero as true and answer 1 or 0.
         case "and": return (env) => map2(l(env), r(env), (a, b) => (a !== 0 && b !== 0 ? 1 : 0));
         case "or": return (env) => map2(l(env), r(env), (a, b) => (a !== 0 || b !== 0 ? 1 : 0));
@@ -1144,10 +1148,36 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
         return map2(a[0](env), a[1](env), (lo, hi) => fCdf(hi, d1, d2) - fCdf(lo, d1, d2));
       };
 
-    case "nPr":
-      return (env) => map2(a[0](env), a[1](env), nPr);
-    case "nCr":
-      return (env) => map2(a[0](env), a[1](env), (n, r) => nCr(n, r));
+    case "randBin": {
+      // randBin(trials, p[, simulations]) — count the successes each time.
+      return (env) => {
+        const trials = num(a[0](env));
+        const prob = num(a[1](env));
+        if (trials < 1 || prob < 0 || prob > 1) return fail(env, "ERR: DOMAIN");
+        const draw = () => {
+          let hits = 0;
+          for (let i = 0; i < trials; i++) if (Math.random() < prob) hits += 1;
+          return hits;
+        };
+        const runs = a[2] ? num(a[2](env)) : 1;
+        return runs <= 1 ? draw() : Array.from({ length: runs }, draw);
+      };
+    }
+
+    case "randIntNoRep":
+      // Every integer in the range, once each, shuffled.
+      return (env) => {
+        const lo = Math.round(num(a[0](env)));
+        const hi = Math.round(num(a[1](env)));
+        if (hi < lo) return fail(env, "ERR: DOMAIN");
+        const out = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+        for (let i = out.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [out[i], out[j]] = [out[j], out[i]];
+        }
+        return out;
+      };
+
     case "randNorm":
       return (env) => {
         const mu = a[0] ? num(a[0](env)) : 0;

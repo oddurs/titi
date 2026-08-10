@@ -87,6 +87,12 @@ names a command the engine does not know, a menu tab that is not there, or a
 file that has moved. Reach for it when deciding what to build next; it is the
 closest thing here to a product backlog.
 
+`docs/roadmap.md` schedules the rest. It names spec rows verbatim, and
+`scripts/roadmap.test.ts` enforces both directions: nothing is scheduled that
+the spec has not admitted is missing, and every `todo` in the spec sits in
+exactly one sprint. So finishing something means moving its row to `done` in
+the spec *and* taking it off the roadmap — the tests fail otherwise.
+
 TI's guidebook is the authority on the device and is linked from the spec, not
 vendored — it is their document.
 

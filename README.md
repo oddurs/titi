@@ -124,6 +124,10 @@ has, what state ours is in, and where it lives. It is checked —
 the code cannot back up. TI's guidebook is the authority on the device itself
 and is linked from there rather than copied.
 
+`docs/roadmap.md` puts the rest in order, five sprints of it, and is checked
+against the spec the same way: every missing feature is scheduled exactly once,
+so nothing falls off the end quietly.
+
 ### Offline
 
 There is no server behind this, so there is no reason for it to need the

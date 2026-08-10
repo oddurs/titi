@@ -116,6 +116,14 @@ longer validates is replaced on its own rather than costing you the rest.
 Drawings are deliberately not saved: a drawing belongs to the window it was
 made in.
 
+### What it does and does not do
+
+`docs/conformance.md` is the spec: every menu, key and behaviour the TI-84 Plus
+has, what state ours is in, and where it lives. It is checked —
+`scripts/conformance.test.ts` reads it back and fails if a row claims something
+the code cannot back up. TI's guidebook is the authority on the device itself
+and is linked from there rather than copied.
+
 ### Offline
 
 There is no server behind this, so there is no reason for it to need the

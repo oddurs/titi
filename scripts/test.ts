@@ -13,6 +13,7 @@ import "./display.test";
 import "./persistence.test";
 import "./golden.test";
 import "./pwa.test";
+import "./conformance.test";
 import { report } from "./harness";
 
 report();

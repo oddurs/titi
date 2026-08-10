@@ -78,6 +78,18 @@ Three layers, and the boundaries matter:
 each inserts or invokes). `lib/calc/menus.ts` is the menus as data. Adding a key
 or a menu item should mean editing data, not adding a branch.
 
+## The spec
+
+`docs/conformance.md` lists every part of the device and its status — `done`,
+`partial`, `todo`, `out-of-scope` — with the file it lives in. Adding a feature
+means moving its row, and `scripts/conformance.test.ts` fails if a `done` row
+names a command the engine does not know, a menu tab that is not there, or a
+file that has moved. Reach for it when deciding what to build next; it is the
+closest thing here to a product backlog.
+
+TI's guidebook is the authority on the device and is linked from the spec, not
+vendored — it is their document.
+
 ## Things that are load-bearing
 
 **The `env` object is mutated in place.** `store.env` is a stable reference the

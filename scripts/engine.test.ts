@@ -1,5 +1,8 @@
-import { describe, eq, reportIfMain } from "./harness";
-import { evaluate, makeEnv, CalcError } from "../lib/math/eval";
+import { describe, eq, near, reportIfMain } from "./harness";
+import {
+  evaluate, makeEnv, CalcError, chi2Cdf, tCdf, fCdf, invT, poissonPdf,
+  poissonCdf, geometPdf, geometCdf, lowerGamma, incompleteBeta, stdNormalCdf,
+} from "../lib/math/eval";
 import { formatValue, toDMS, toFraction } from "../lib/math/format";
 
 const env = makeEnv();
@@ -167,5 +170,77 @@ describe("list operations");
   check("ΔList({5})", "ERR: DIM MISMATCH");
   check("cumSum(seq(X,X,1,4))", "{1 3 6 10}");
 }
+
+describe("the distributions, against what they must equal");
+{
+  // Every check here is an identity the distribution has to satisfy, not a
+  // number copied out of a table — a wrong table entry and a wrong
+  // implementation look identical, an identity does not.
+  const p = (x: number) => x;
+  void p;
+
+  // χ² with two degrees of freedom is exponential: P(X ≤ x) = 1 - e^(-x/2).
+  for (const x of [0.5, 1, 3, 7.5]) {
+    near(`χ²cdf(${x}, 2) is exponential`, chi2Cdf(x, 2), 1 - Math.exp(-x / 2), 1e-12);
+  }
+  // With one degree of freedom it is the square of a standard normal.
+  for (const x of [0.25, 1, 4]) {
+    near(`χ²cdf(${x}, 1) is Φ(√x) doubled`, chi2Cdf(x, 1), 2 * stdNormalCdf(Math.sqrt(x)) - 1, 1e-10);
+  }
+
+  // Student's t with one degree of freedom is Cauchy.
+  for (const x of [-3, -0.5, 0, 0.5, 3]) {
+    near(`tcdf(${x}, 1) is Cauchy`, tCdf(x, 1), 0.5 + Math.atan(x) / Math.PI, 1e-10);
+  }
+  near("t is symmetric about zero", tCdf(0, 7), 0.5, 1e-12);
+  for (const df of [1, 4, 30]) {
+    near(`t(${df}) tails mirror`, tCdf(-1.7, df) + tCdf(1.7, df), 1, 1e-10);
+  }
+  // As the degrees of freedom climb, t approaches the normal.
+  near("t(5000) is all but normal", tCdf(1.96, 5000), stdNormalCdf(1.96), 1e-3);
+
+  // invT is the inverse of tCdf, which is the only thing it has to be.
+  for (const [q, df] of [[0.9, 3], [0.975, 10], [0.5, 7], [0.01, 25]] as const) {
+    near(`invT(${q}, ${df}) round-trips`, tCdf(invT(q, df), df), q, 1e-9);
+  }
+
+  // F(1, d) is t(d) squared: P(F ≤ x) = P(|T| ≤ √x).
+  for (const [x, df] of [[1, 5], [4, 12], [0.25, 3]] as const) {
+    near(`Fcdf(${x}, 1, ${df}) is t squared`, fCdf(x, 1, df), 2 * tCdf(Math.sqrt(x), df) - 1, 1e-9);
+  }
+  // And F is its own mirror with the degrees of freedom swapped.
+  near("F mirrors under 1/x", fCdf(3, 4, 9), 1 - fCdf(1 / 3, 9, 4), 1e-10);
+
+  // The discrete ones must add up to their own CDFs.
+  {
+    let sum = 0;
+    for (let k = 0; k <= 6; k++) sum += poissonPdf(2.5, k);
+    near("poissoncdf is the sum of poissonpdf", poissonCdf(2.5, 6), sum, 1e-12);
+  }
+  for (const k of [1, 3, 8]) {
+    near(`geometcdf(${k}) is 1-(1-p)^k`, geometCdf(0.3, k), 1 - Math.pow(0.7, k), 1e-12);
+  }
+  near("geometpdf sums to its cdf",
+    geometPdf(0.4, 1) + geometPdf(0.4, 2) + geometPdf(0.4, 3), geometCdf(0.4, 3), 1e-12);
+
+  // The incomplete functions, on their defining relations.
+  near("P(1, x) is 1 - e^-x", lowerGamma(1, 2.5), 1 - Math.exp(-2.5), 1e-12);
+  near("I(x;a,b) and its mirror sum to one",
+    incompleteBeta(0.3, 2.5, 4) + incompleteBeta(0.7, 4, 2.5), 1, 1e-12);
+  near("I(x;1,1) is x", incompleteBeta(0.42, 1, 1), 0.42, 1e-12);
+}
+
+describe("counting");
+check("nPr(10,3)", "720", toRad);
+check("nCr(10,3)", "120");
+check("nCr(200,100)", "9.054851466ᴇ58");
+check("nCr(5,0)", "1");
+check("nCr(5,6)", "0");
+check("nPr(5,5)", "120");
+check("poissonpdf(3,2)", ".2240418077");
+check("geometcdf(.3,3)", ".657");
+check("χ²cdf(0,3.841458821,1)", ".95");
+check("tcdf(-1ᴇ99,2.228138852,10)", ".975");
+check("invT(.975,10)", "2.228138852");
 
 reportIfMain(import.meta.url);

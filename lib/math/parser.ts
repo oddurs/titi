@@ -27,6 +27,10 @@ const ARITY: Record<string, [number, number]> = {
   real: [1, 1], imag: [1, 1], angle: [1, 1], "@seq": [2, 2],
   rectToR: [2, 2], rectToTheta: [2, 2], polarToX: [2, 2], polarToY: [2, 2],
   sortA: [1, 1], sortD: [1, 1], cumSum: [1, 1], deltaList: [1, 1], prod: [1, 3],
+  poissonpdf: [2, 2], poissoncdf: [2, 2], geometpdf: [2, 2], geometcdf: [2, 2],
+  tpdf: [2, 2], tcdf: [2, 3], invT: [2, 2],
+  chi2pdf: [2, 2], chi2cdf: [2, 3], Fpdf: [3, 3], Fcdf: [3, 4],
+  nPr: [2, 2], nCr: [2, 2], randNorm: [0, 3],
   normalpdf: [1, 3], normalcdf: [2, 4], invNorm: [1, 3],
   binompdf: [2, 3], binomcdf: [2, 3], solve: [2, 4],
 };

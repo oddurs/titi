@@ -67,7 +67,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | --- | --- | --- | --- |
 | `MATH ▸ MATH` | `▸Frac`, `▸Dec`, `x³`, `∛(`, `ˣ√(`, `fMin(`, `nDeriv(`, `fnInt(`, `solve(`, Solver | done | `lib/calc/menus.ts` |
 | `MATH ▸ NUM` | `abs(`, `round(`, `iPart(`, `fPart(`, `int(`, `min(`, `max(`, `lcm(`, `gcd(` | done | `lib/math/eval.ts` |
-| `MATH ▸ PRB` | `rand`, `!`, `randInt(` | partial | no `nPr`, `nCr` or `randNorm(` |
+| `MATH ▸ PRB` | `rand`, `nPr(`, `nCr(`, `!`, `randInt(`, `randNorm(` | done | `lib/math/eval.ts` |
 | `MATH ▸ CPX` | Complex operations live under their own names instead | partial | `conj(`, `real(`, `imag(`, `angle(`, `abs(` all exist |
 | `MATH ▸ NUM ▸ remainder(` | — | todo | — |
 
@@ -155,7 +155,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | --- | --- | --- | --- |
 | `normalpdf(` `normalcdf(` `invNorm(` | With West's normal CDF behind them | done | `lib/math/eval.ts` |
 | `binompdf(` `binomcdf(` | — | done | `lib/math/eval.ts` |
-| `poissonpdf(` `geometpdf(` and the t/χ²/F family | — | todo | — |
+| `poissonpdf(` `geometpdf(` and the t/χ²/F family | Plus `invT(`, on the regularised incomplete gamma and beta | done | `lib/math/eval.ts` |
 
 ## LIST
 

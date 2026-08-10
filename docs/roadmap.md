@@ -23,22 +23,10 @@ day with tests, `L` needs a design decision first.
 | 4 | The long tail — LIST OPS, a generated catalog, contrast, the keypad as one tab stop | `ac610ce` |
 | 5 | The things that were stored and ignored — `Indpnt: Ask`, programs that ask and draw, offline and installable | `bfc35e8` |
 | — | The spec itself, and a test that keeps it honest | `bc417cb` |
-| 6 | The rest of the statistics — frequency lists, Med-Med, CubicReg and QuartReg, modified box plots | pending |
+| 6 | The rest of the statistics — frequency lists, Med-Med, CubicReg and QuartReg, modified box plots | `6d5ad82` |
+| 7 | Distributions and probability — Poisson, geometric, t, χ², F, invT, and the counting functions | pending |
 
 ---
-
-## Sprint 7 — Distributions and probability
-
-**Why now.** `DISTR` has the normal and the binomial and stops, which covers
-about half of what the menu is reached for. The infrastructure is already
-there — `stdNormalCdf` is West's algorithm and the Lanczos gamma is in place —
-so the remaining distributions are mostly continued fractions on top of code
-that exists and is tested.
-
-| Spec row | What it takes | Size |
-| --- | --- | --- |
-| `poissonpdf(` `geometpdf(` and the t/χ²/F family | Poisson and geometric are closed form. Student's t, χ² and F need the regularised incomplete beta and gamma — one continued fraction each, on the Lanczos gamma already here. Plus `invT`. | L |
-| `MATH ▸ PRB` | `nPr`, `nCr` and `randNorm(`. The first two are the existing gamma; the third is Box–Muller. | S |
 
 ## Sprint 8 — Programs that react
 

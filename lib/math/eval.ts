@@ -221,8 +221,204 @@ export function invNorm(p: number, mu = 0, sd = 1): number {
   return mu + sd * ((lo + hi) / 2);
 }
 
-const nCr = (n: number, r: number) =>
-  Math.round(gammaFn(n + 1) / (gammaFn(r + 1) * gammaFn(n - r + 1)));
+/**
+ * log Γ, for the places where Γ itself overflows.
+ *
+ * nCr(200,100) has no chance in double precision as a ratio of factorials, but
+ * it is only 9e58 once the logs cancel — so combinatorics and the discrete
+ * distributions all go through here.
+ */
+function lnGamma(x: number): number {
+  if (x < 0.5) return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * x))) - lnGamma(1 - x);
+  const g = 7;
+  const c = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7,
+  ];
+  const z = x - 1;
+  let a = c[0];
+  const t = z + g + 0.5;
+  for (let i = 1; i < g + 2; i++) a += c[i] / (z + i);
+  return 0.5 * Math.log(TAU) + (z + 0.5) * Math.log(t) - t + Math.log(a);
+}
+
+/** n choose r, exact for the counts a calculator is asked for. */
+export const nCr = (n: number, r: number) => {
+  if (r < 0 || r > n) return 0;
+  return Math.round(Math.exp(lnGamma(n + 1) - lnGamma(r + 1) - lnGamma(n - r + 1)));
+};
+
+/** Permutations: n falling r. */
+export const nPr = (n: number, r: number) => {
+  if (r < 0 || r > n) return 0;
+  return Math.round(Math.exp(lnGamma(n + 1) - lnGamma(n - r + 1)));
+};
+
+/**
+ * The regularised incomplete gamma P(a, x).
+ *
+ * Series below the turning point, continued fraction above it — the classic
+ * split, because each converges quickly exactly where the other does not.
+ * Everything discrete and everything χ²-shaped is built on this.
+ */
+export function lowerGamma(a: number, x: number): number {
+  if (x <= 0) return 0;
+  if (x < a + 1) {
+    // series
+    let term = 1 / a;
+    let sum = term;
+    for (let n = 1; n < 500; n++) {
+      term *= x / (a + n);
+      sum += term;
+      if (Math.abs(term) < Math.abs(sum) * 1e-16) break;
+    }
+    return sum * Math.exp(-x + a * Math.log(x) - lnGamma(a));
+  }
+  // continued fraction, in Lentz's form
+  const tiny = 1e-300;
+  let b = x + 1 - a;
+  let c = 1 / tiny;
+  let d = 1 / b;
+  let h = d;
+  for (let i = 1; i < 500; i++) {
+    const an = -i * (i - a);
+    b += 2;
+    d = an * d + b;
+    if (Math.abs(d) < tiny) d = tiny;
+    c = b + an / c;
+    if (Math.abs(c) < tiny) c = tiny;
+    d = 1 / d;
+    const delta = d * c;
+    h *= delta;
+    if (Math.abs(delta - 1) < 1e-16) break;
+  }
+  return 1 - Math.exp(-x + a * Math.log(x) - lnGamma(a)) * h;
+}
+
+/**
+ * The regularised incomplete beta I(x; a, b).
+ *
+ * Student's t and F both reduce to this. The continued fraction converges for
+ * x below (a+1)/(a+b+2); above it the symmetry I(x;a,b) = 1 - I(1-x;b,a)
+ * puts the argument back in range.
+ */
+export function incompleteBeta(x: number, a: number, b: number): number {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  if (x > (a + 1) / (a + b + 2)) return 1 - incompleteBeta(1 - x, b, a);
+
+  const front = Math.exp(
+    a * Math.log(x) + b * Math.log(1 - x) + lnGamma(a + b) - lnGamma(a) - lnGamma(b),
+  ) / a;
+
+  const tiny = 1e-300;
+  let c = 1;
+  let d = 1 - ((a + b) * x) / (a + 1);
+  if (Math.abs(d) < tiny) d = tiny;
+  d = 1 / d;
+  let h = d;
+  for (let i = 1; i < 500; i++) {
+    // Two terms per m, the even one first. The -(a+b)x/(a+1) term that would
+    // be i=0 has already gone into d above, so m counts from one.
+    const m = Math.ceil(i / 2);
+    const numerator =
+      i % 2 === 1
+        ? (m * (b - m) * x) / ((a + 2 * m - 1) * (a + 2 * m))
+        : -((a + m) * (a + b + m) * x) / ((a + 2 * m) * (a + 2 * m + 1));
+    d = 1 + numerator * d;
+    if (Math.abs(d) < tiny) d = tiny;
+    d = 1 / d;
+    c = 1 + numerator / c;
+    if (Math.abs(c) < tiny) c = tiny;
+    const delta = c * d;
+    h *= delta;
+    if (Math.abs(delta - 1) < 1e-15) break;
+  }
+  return front * h;
+}
+
+// -- the distributions the DISTR menu offers -------------------------------
+
+export const poissonPdf = (mu: number, k: number) => {
+  if (mu < 0 || k < 0 || !Number.isInteger(k)) throw new CalcError("ERR: DOMAIN");
+  return Math.exp(-mu + k * Math.log(mu || 1) - lnGamma(k + 1)) * (mu === 0 ? (k === 0 ? 1 : 0) : 1);
+};
+
+export const poissonCdf = (mu: number, k: number) => {
+  if (mu < 0 || k < 0) throw new CalcError("ERR: DOMAIN");
+  // P(X ≤ k) = Q(k+1, mu), the upper regularised gamma.
+  return 1 - lowerGamma(Math.floor(k) + 1, mu);
+};
+
+export const geometPdf = (p: number, k: number) => {
+  if (p <= 0 || p > 1 || k < 1 || !Number.isInteger(k)) throw new CalcError("ERR: DOMAIN");
+  return p * Math.pow(1 - p, k - 1);
+};
+
+export const geometCdf = (p: number, k: number) => {
+  if (p <= 0 || p > 1 || k < 1) throw new CalcError("ERR: DOMAIN");
+  return 1 - Math.pow(1 - p, Math.floor(k));
+};
+
+export const tPdf = (x: number, df: number) => {
+  if (df <= 0) throw new CalcError("ERR: DOMAIN");
+  return (
+    Math.exp(lnGamma((df + 1) / 2) - lnGamma(df / 2)) /
+    Math.sqrt(df * Math.PI) *
+    Math.pow(1 + (x * x) / df, -(df + 1) / 2)
+  );
+};
+
+/** P(T ≤ x) for Student's t. */
+export const tCdf = (x: number, df: number) => {
+  if (df <= 0) throw new CalcError("ERR: DOMAIN");
+  const p = 0.5 * incompleteBeta(df / (df + x * x), df / 2, 0.5);
+  return x >= 0 ? 1 - p : p;
+};
+
+export const chi2Pdf = (x: number, df: number) => {
+  if (df <= 0) throw new CalcError("ERR: DOMAIN");
+  if (x < 0) return 0;
+  if (x === 0) return df === 2 ? 0.5 : 0;
+  return Math.exp((df / 2 - 1) * Math.log(x) - x / 2 - lnGamma(df / 2) - (df / 2) * Math.LN2);
+};
+
+export const chi2Cdf = (x: number, df: number) => {
+  if (df <= 0) throw new CalcError("ERR: DOMAIN");
+  return x <= 0 ? 0 : lowerGamma(df / 2, x / 2);
+};
+
+export const fPdf = (x: number, d1: number, d2: number) => {
+  if (d1 <= 0 || d2 <= 0) throw new CalcError("ERR: DOMAIN");
+  if (x <= 0) return 0;
+  const lnNum =
+    (d1 / 2) * Math.log(d1) + (d2 / 2) * Math.log(d2) +
+    (d1 / 2 - 1) * Math.log(x) - ((d1 + d2) / 2) * Math.log(d2 + d1 * x);
+  return Math.exp(lnNum + lnGamma((d1 + d2) / 2) - lnGamma(d1 / 2) - lnGamma(d2 / 2));
+};
+
+export const fCdf = (x: number, d1: number, d2: number) => {
+  if (d1 <= 0 || d2 <= 0) throw new CalcError("ERR: DOMAIN");
+  return x <= 0 ? 0 : incompleteBeta((d1 * x) / (d1 * x + d2), d1 / 2, d2 / 2);
+};
+
+/** The inverse of tCdf, by bisection — monotone, so nothing cleverer is needed. */
+export function invT(p: number, df: number): number {
+  if (p <= 0 || p >= 1 || df <= 0) throw new CalcError("ERR: DOMAIN");
+  let lo = -1e4;
+  let hi = 1e4;
+  for (let i = 0; i < 300; i++) {
+    const mid = (lo + hi) / 2;
+    if (tCdf(mid, df) < p) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/** A standard normal deviate, by Box–Muller. */
+export const randNorm = (mu = 0, sd = 1) =>
+  mu + sd * Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(TAU * Math.random());
 
 const binomPdf = (n: number, p: number, k: number) =>
   nCr(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
@@ -868,6 +1064,64 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
         return Array.from({ length: n }, draw);
       };
     }
+
+    // The discrete ones map element-wise, so a list of counts works.
+    case "poissonpdf":
+      return (env) => map2(a[0](env), a[1](env), poissonPdf);
+    case "poissoncdf":
+      return (env) => map2(a[0](env), a[1](env), poissonCdf);
+    case "geometpdf":
+      return (env) => map2(a[0](env), a[1](env), geometPdf);
+    case "geometcdf":
+      return (env) => map2(a[0](env), a[1](env), geometCdf);
+
+    case "tpdf":
+      return (env) => map2(a[0](env), a[1](env), tPdf);
+    case "chi2pdf":
+      return (env) => map2(a[0](env), a[1](env), chi2Pdf);
+    case "invT":
+      return (env) => map2(a[0](env), a[1](env), invT);
+
+    // The continuous CDFs take an interval on the device: two bounds and then
+    // the parameters. One bound is the tail from there.
+    case "tcdf":
+      return (env) => {
+        const df = num(a[2] ? a[2](env) : a[1](env));
+        if (!a[2]) return map1(a[0](env), (x) => tCdf(x, df));
+        return map2(a[0](env), a[1](env), (lo, hi) => tCdf(hi, df) - tCdf(lo, df));
+      };
+    case "chi2cdf":
+      return (env) => {
+        const df = num(a[2] ? a[2](env) : a[1](env));
+        if (!a[2]) return map1(a[0](env), (x) => chi2Cdf(x, df));
+        return map2(a[0](env), a[1](env), (lo, hi) => chi2Cdf(hi, df) - chi2Cdf(lo, df));
+      };
+    case "Fpdf":
+      return (env) => map1(a[0](env), (x) => fPdf(x, num(a[1](env)), num(a[2](env))));
+    case "Fcdf":
+      return (env) => {
+        if (!a[3]) {
+          const d1 = num(a[1](env));
+          const d2 = num(a[2](env));
+          return map1(a[0](env), (x) => fCdf(x, d1, d2));
+        }
+        const d1 = num(a[2](env));
+        const d2 = num(a[3](env));
+        return map2(a[0](env), a[1](env), (lo, hi) => fCdf(hi, d1, d2) - fCdf(lo, d1, d2));
+      };
+
+    case "nPr":
+      return (env) => map2(a[0](env), a[1](env), nPr);
+    case "nCr":
+      return (env) => map2(a[0](env), a[1](env), (n, r) => nCr(n, r));
+    case "randNorm":
+      return (env) => {
+        const mu = a[0] ? num(a[0](env)) : 0;
+        const sd = a[1] ? num(a[1](env)) : 1;
+        const n = a[2] ? num(a[2](env)) : 1;
+        if (n <= 1) return randNorm(mu, sd);
+        return Array.from({ length: n }, () => randNorm(mu, sd));
+      };
 
     case "normalpdf":
       return (env) => {

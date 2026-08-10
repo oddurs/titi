@@ -314,12 +314,18 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
 
   apps: {
     title: "apps",
+    // Nothing is installed, and nothing is meant to be — offering a choice
+    // that does nothing is worse than saying so.
     tabs: [
       {
         name: "apps",
         items: [
-          act("Finance", "app:finance", "time value of money"),
-          act("Inequalz", "app:none", "not installed", ),
+          {
+            label: "No apps installed",
+            action: "noop",
+            hint: "this device ships without them",
+            disabled: true,
+          },
         ],
       },
     ],

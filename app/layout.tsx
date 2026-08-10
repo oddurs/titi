@@ -22,10 +22,21 @@ const ui = Barlow({
   weight: ["400", "500", "600"],
 });
 
+const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 export const metadata: Metadata = {
   title: "titi — graphing calculator",
   description:
     "A scientific and graphing calculator with the TI-84's keys and none of its pixels.",
+  manifest: `${base}/manifest.webmanifest`,
+  appleWebApp: { capable: true, title: "titi", statusBarStyle: "black-translucent" },
+  icons: {
+    icon: [
+      { url: `${base}/icon-192.png`, sizes: "192x192", type: "image/png" },
+      { url: `${base}/icon-512.png`, sizes: "512x512", type: "image/png" },
+    ],
+    apple: `${base}/apple-touch-icon.png`,
+  },
 };
 
 export const viewport: Viewport = {

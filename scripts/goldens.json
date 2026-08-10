@@ -111,11 +111,22 @@
     ]
   },
   "tblset": {
-    "digest": "bcc6d773",
+    "digest": "a31d70f1",
     "transcript": [
       "TBLSET RAD",
       "TblStart= 0",
-      "ΔTbl= 1"
+      "ΔTbl= 1",
+      "Indpnt: Auto Ask"
+    ]
+  },
+  "table-ask": {
+    "digest": "f8d528ea",
+    "transcript": [
+      "TABLE RAD",
+      "X Y₁",
+      "3 9",
+      "5 25",
+      "8 64"
     ]
   },
   "table": {
@@ -398,6 +409,31 @@
       "PRESS ENTER"
     ]
   },
+  "prgm-menu": {
+    "digest": "a4164947",
+    "transcript": [
+      "PRGM DRAW WHAT? RAD",
+      "1:TARGET",
+      "2:WAVE",
+      "PAUSED - PRESS ENTER"
+    ]
+  },
+  "prgm-drawn": {
+    "digest": "32a0dd43",
+    "transcript": [
+      "GRAPH RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "TARGET",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8"
+    ]
+  },
   "solver": {
     "digest": "856de812",
     "transcript": [
@@ -463,12 +499,13 @@
     ]
   },
   "menu-prgm": {
-    "digest": "c3bf8ed9",
+    "digest": "93f45b91",
     "transcript": [
       "HOME EXEC EDIT NEW RAD",
       "1:QUADRAT",
       "2:COLLATZ",
       "3:FIB",
+      "4:SHAPES",
       "READY",
       ">"
     ]

@@ -83,7 +83,10 @@ export interface GraphWindow {
 export interface TableSetup {
   start: number;
   step: number;
+  /** Indpnt: Auto walks from start by step; Ask waits for typed X values */
   auto: boolean;
+  /** the X values typed in Ask mode */
+  ask: number[];
 }
 
 export interface Modes {
@@ -180,5 +183,7 @@ export type EditTarget =
   /** row -1 addresses the dimension line, where col 0 is rows and 1 is columns */
   | { kind: "matrix"; name: string; row: number; col: number }
   | { kind: "prgm"; line: number }
+  /** the X column of the table, in Ask mode */
+  | { kind: "table" }
   /** row 0 is the equation, then one row per variable, then the bounds */
   | { kind: "solver"; row: number };

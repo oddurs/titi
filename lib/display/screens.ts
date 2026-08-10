@@ -300,7 +300,23 @@ function renderTblSet(pen: Pen, s: CalcState, top: number, hits: HitRegion[]) {
     { label: "TblStart", value: formatNumber(s.tbl.start, plain) },
     { label: "ΔTbl", value: formatNumber(s.tbl.step, plain) },
   ];
-  renderFieldList(pen, s, top, hits, fields, s.target.kind === "tblset" ? s.target.row : -1);
+  const active = s.target.kind === "tblset" ? s.target.row : -1;
+  renderFieldList(pen, s, top, hits, fields, active > 1 ? -1 : active);
+
+  // Indpnt is a choice, not a number, so it is drawn as two chips with the
+  // live one in inverse — the way the device shows every either/or.
+  const row = Math.ceil(top / CHAR_H) + fields.length;
+  const label = "Indpnt:";
+  pen.text(0, row, label, active === 2 ? INK.on : INK.dim);
+  let col = label.length + 1;
+  for (const [name, isAuto] of [["Auto", true], ["Ask", false]] as const) {
+    if (isAuto === s.tbl.auto) pen.inverse(col, row, name.length, name, INK.on);
+    else pen.text(col, row, name, INK.dim);
+    col += name.length + 1;
+  }
+  hits.push({
+    kind: "row", index: 2, x: 0, y: rowAt(0, row) - 1, w: pen.cols, h: CHAR_H,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -327,9 +343,24 @@ function renderTable(pen: Pen, s: CalcState, top: number) {
   pen.hline(0, pen.cols - 1, rowAt(0, first) + CHAR_H - 1, "#33526f");
 
   const rows = pen.textRows - first - 1;
+  // In Ask mode the X column is whatever has been typed, plus the line being
+  // typed now; in Auto it walks from TblStart by ΔTbl.
+  const asked = s.tbl.auto ? null : s.tbl.ask;
+
   for (let r = 0; r < rows; r++) {
-    const x = s.tbl.start + (s.row + r) * s.tbl.step;
     const row = first + 1 + r;
+    if (asked) {
+      const i = s.row + r;
+      if (i > asked.length) break;
+      if (i === asked.length) {
+        // the line being typed
+        const shown = tailFit(s.entry.text, s.entry.caret, colWidth - 1);
+        pen.text(0, row, shown.text, INK.on);
+        pen.cursor(shown.caret, row);
+        break;
+      }
+    }
+    const x = asked ? asked[s.row + r] : s.tbl.start + (s.row + r) * s.tbl.step;
     pen.text(0, row, pen.clip(formatNumber(x, fmt), colWidth - 1), INK.dim);
     for (let c = 0; c < cols; c++) {
       let v = "-";
@@ -342,6 +373,9 @@ function renderTable(pen: Pen, s: CalcState, top: number) {
       }
       pen.text((c + 1) * colWidth, row, pen.clip(v, colWidth - 1), INK.on);
     }
+  }
+  if (asked && !asked.length) {
+    pen.text(0, pen.textRows - 1, "TYPE AN X VALUE", INK.dim);
   }
 }
 
@@ -606,8 +640,10 @@ function renderMenu(pen: Pen, s: CalcState, hits: HitRegion[]) {
     const item = items[idx];
     const label = `${idx + 1}:${item.label}`;
     const text = pen.clip(label, pen.textCols);
-    if (idx === menu.index) pen.inverse(0, row, pen.textCols, text, INK.on);
-    else pen.text(0, row, text, INK.on);
+    // A disabled item is still shown — it is telling you something — but it
+    // is drawn dim so it never reads as a choice.
+    if (idx === menu.index) pen.inverse(0, row, pen.textCols, text, item.disabled ? INK.dim : INK.on);
+    else pen.text(0, row, text, item.disabled ? INK.dim : INK.on);
     hits.push({
       kind: "menuItem", index: idx,
       x: 0, y: rowAt(0, row) - 1, w: pen.cols, h: CHAR_H,

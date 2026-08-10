@@ -14,6 +14,17 @@ export default function Device() {
     hydrate();
   }, [hydrate]);
 
+  // Keep the whole calculator on the device. Only in a real build — in dev the
+  // worker would cache chunks that hot reload is about to replace.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") return;
+    if (!("serviceWorker" in navigator)) return;
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    navigator.serviceWorker.register(`${base}/sw.js`, { scope: `${base}/` }).catch(() => {
+      /* an unavailable worker just means the app needs the network */
+    });
+  }, []);
+
   return (
     <main className="stage">
       <div className="device">

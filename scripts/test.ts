@@ -12,6 +12,7 @@ import "./analysis.test";
 import "./display.test";
 import "./persistence.test";
 import "./golden.test";
+import "./pwa.test";
 import { report } from "./harness";
 
 report();

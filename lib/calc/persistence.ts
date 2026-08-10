@@ -48,7 +48,7 @@ export function defaultSave(): SavedState {
     ys: freshYs(),
     win: { ...STANDARD_WINDOW },
     modes: { ...DEFAULT_MODES },
-    tbl: { start: 0, step: 1, auto: true },
+    tbl: { start: 0, step: 1, auto: true, ask: [] },
     lists: Array.from({ length: 6 }, () => [] as number[]),
     plots: freshPlots(),
     mats: { "[A]": identity(2) },
@@ -140,7 +140,11 @@ const validHistory = (v: unknown) =>
 const validSolver = (v: unknown) =>
   isObject(v) && isStr(v.equation) && Array.isArray(v.bound) && v.bound.length === 2;
 
-const validTbl = (v: unknown) => isObject(v) && isNum(v.start) && isNum(v.step);
+const validTbl = (v: unknown) =>
+  isObject(v) &&
+  isNum(v.start) &&
+  isNum(v.step) &&
+  (v.ask === undefined || (Array.isArray(v.ask) && v.ask.every(isNum)));
 
 const validPlots = (v: unknown) =>
   Array.isArray(v) && v.every((p) => isObject(p) && typeof p.on === "boolean");
@@ -207,6 +211,8 @@ export function deserialize(raw: string | null): LoadResult {
   // An empty program list means the samples were deleted, not that the save
   // is old — but a save that never had the field should get them.
   if (data.programs === undefined) state.programs = base.programs;
+  // Ask mode arrived after the first saves; an older tbl has no list.
+  if (!Array.isArray(state.tbl.ask)) state.tbl = { ...state.tbl, ask: [] };
 
   return { state, rejected, fresh: false };
 }

@@ -149,4 +149,81 @@ const collatz = SAMPLE_PROGRAMS.find((p) => p.name === "COLLATZ")!;
 eq("COLLATZ(6) takes 8 steps", run(collatz.body, ["6"]), ["STEPS", "8"]);
 eq("COLLATZ(1) takes 0 steps", run(collatz.body, ["1"]), ["STEPS", "0"]);
 
+describe("a program can offer a choice");
+{
+  const body = [
+    'Menu("PICK","ONE",A,"TWO",B)',
+    'Lbl A',
+    'Disp "FIRST"',
+    'Stop',
+    'Lbl B',
+    'Disp "SECOND"',
+  ].join("\n");
+
+  const env = makeEnv();
+  const vm = new Interpreter({ name: "M", body }, env, fmt);
+  const st = vm.run();
+  eq("it suspends on the menu", st.kind, "menu");
+  if (st.kind === "menu") {
+    eq("with its title", st.title, "PICK");
+    eq("and its choices", st.options.map((o) => o.label), ["ONE", "TWO"]);
+    eq("each naming a label", st.options.map((o) => o.target), ["A", "B"]);
+  }
+  vm.chooseMenu("B");
+  eq("choosing runs from that label", vm.run().kind, "done");
+  eq("and only that branch", vm.output, ["SECOND"]);
+}
+{
+  const env = makeEnv();
+  const vm = new Interpreter(
+    { name: "M", body: 'Menu("X","ONE",A)\nLbl A\nDisp 1' }, env, fmt,
+  );
+  vm.run();
+  vm.chooseMenu("NOWHERE");
+  eq("a choice with no label stops rather than running on", vm.run().kind, "done");
+  eq("with nothing printed", vm.output, []);
+}
+eq("a menu with no options is a syntax error", run('Menu("X")'), ["ERR: SYNTAX"]);
+
+describe("a program can draw");
+{
+  const env = makeEnv();
+  const vm = new Interpreter(
+    {
+      name: "D",
+      body: [
+        "ClrDraw",
+        "Line(-1,-2,3,4)",
+        "Horizontal 5",
+        "Vertical -5",
+        "Circle(0,0,2)",
+        "Pt-On(1,1)",
+        "Pt-Off(2,2)",
+        'Text(1,2,"HI")',
+      ].join("\n"),
+    },
+    env,
+    fmt,
+  );
+  eq("it runs to the end", vm.run().kind, "done");
+  eq("every command is recorded", vm.draws.map((d) => d.cmd), [
+    "clear", "line", "hline", "vline", "circle", "point", "point", "text",
+  ]);
+  eq("with its coordinates", vm.draws[1].args, [-1, -2, 3, 4]);
+  eq("Pt-Off is marked as an erase", vm.draws[6].args[2], 1);
+  eq("and Pt-On is not", vm.draws[5].args[2], 0);
+  eq("text carries its string", vm.draws[7].text, "HI");
+}
+{
+  const env = makeEnv();
+  const vm = new Interpreter(
+    { name: "D", body: "5→R\nFor(I,1,3)\nCircle(0,0,R*I)\nEnd" }, env, fmt,
+  );
+  vm.run();
+  eq("arguments are expressions, not just numbers",
+    vm.draws.map((d) => d.args[2]), [5, 10, 15]);
+}
+eq("a drawing of a list is a data type error",
+  run('Line(1,2,3,{1,2})'), ["ERR: DATA TYPE"]);
+
 reportIfMain(import.meta.url);

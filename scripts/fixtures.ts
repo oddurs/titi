@@ -55,6 +55,13 @@ export const FIXTURES: Record<string, () => Device> = {
 
   tblset: () => device().press("2nd tblset"),
 
+  "table-ask": () =>
+    device()
+      .press("y=").press("X,T,θ,n").press("x²").press("enter")
+      .press("2nd tblset").repeat("down", 2).press("right")
+      .press("2nd table")
+      .type("3").press("enter").type("5").press("enter").type("8").press("enter"),
+
   table: () =>
     device()
       .press("y=").press("X,T,θ,n").press("x²").press("enter")
@@ -149,6 +156,11 @@ export const FIXTURES: Record<string, () => Device> = {
 
   "prgm-done": () =>
     device().press("prgm").repeat("down", 2).press("enter").type("10").press("enter"),
+
+  "prgm-menu": () => device().press("prgm").repeat("down", 3).press("enter"),
+
+  "prgm-drawn": () =>
+    device().press("prgm").repeat("down", 3).press("enter").press("enter").press("graph"),
 
   solver: () =>
     device()

@@ -10,6 +10,7 @@ npm run dev        # http://localhost:9991 — always use this port
 npm run check      # typecheck + lint + tests; run before declaring done
 npm test           # every suite in one process, one total
 npm run build      # static export to ./out
+npm run icons      # redraw public/*.png from the glyph ROM
 ```
 
 Suites live in `scripts/` and share `harness.ts`. Each ends with
@@ -113,6 +114,17 @@ appears only when the user writes `i` or an operation leaves the reals *and*
 `env.complex === "a+bi"`. Complex never combines with a list or a matrix;
 `complexPair` enforces that. Results collapse back to a real when the imaginary
 part is rounding noise.
+
+**The interpreter never imports the device.** `Menu(` returns a status the
+store turns into a real menu, and the drawing statements push `DrawCommand`s
+that `programs.ts` maps to `Drawing`s. `lib/math` stays pure: it emits
+coordinates and lets the caller decide what they mean.
+
+**The service worker reads the page to find the build.** Asset names are
+hashed, so `public/sw.js` fetches the start page at install and precaches every
+same-origin `src`/`href` it names. Without that, the first offline load finds
+an empty cache — a worker only controls the visits *after* the one that
+installed it.
 
 **The program interpreter suspends, it does not block.** `run()` returns a
 status; the store supplies input and calls `run()` again. The live `Interpreter`

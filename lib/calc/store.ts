@@ -297,8 +297,11 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         decimals: -1,
       });
     } else if (target.kind === "tblset") {
-      const v = target.row === 0 ? st.tbl.start : st.tbl.step;
-      text = formatNumber(v, { notation: "normal", decimals: -1 });
+      text = target.row === 2
+        ? ""
+        : formatNumber(target.row === 0 ? st.tbl.start : st.tbl.step, {
+            notation: "normal", decimals: -1,
+          });
     } else if (target.kind === "stat") {
       const v = st.lists[target.col]?.[target.row];
       text = v === undefined ? "" : formatNumber(v, { notation: "normal", decimals: -1 });
@@ -362,7 +365,25 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       return;
     }
 
+    if (t.kind === "table") {
+      const v = numberFromEntry();
+      if (v === undefined) return;
+      if (v === null) {
+        note("ERR: INVALID");
+        return;
+      }
+      set({
+        tbl: { ...st.tbl, ask: [...st.tbl.ask, v] },
+        entry: { text: "", caret: 0 },
+        revision: st.revision + 1,
+      });
+      persist();
+      return;
+    }
+
     if (t.kind === "tblset") {
+      // The third row is Indpnt, which is a choice rather than a number.
+      if (t.row === 2) return;
       const v = numberFromEntry();
       if (v === undefined) return;
       if (v === null) {
@@ -480,7 +501,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       loadEditTarget({ kind: "window", row });
       set({ row });
     } else if (t.kind === "tblset") {
-      const row = clamp(t.row + delta, 0, 1);
+      const row = clamp(t.row + delta, 0, 2);
       loadEditTarget({ kind: "tblset", row });
       set({ row });
     } else if (t.kind === "stat") {
@@ -579,8 +600,16 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       set({ screen, menu: null });
       loadEditTarget({ kind: "prgm", line: 0 });
     } else if (screen === "table") {
-      // The table's row is a scroll offset, not a field cursor — start at TblStart.
-      set({ screen, menu: null, row: 0, target: { kind: "home" } });
+      // The row is a scroll offset here, not a field cursor, so it starts at
+      // the top. In Ask mode the X column is an edit field as well.
+      set({
+        screen,
+        menu: null,
+        row: 0,
+        entry: { text: "", caret: 0 },
+        entryFresh: false,
+        target: get().tbl.auto ? { kind: "home" } : { kind: "table" },
+      });
     } else if (screen === "home") {
       set({
         screen,
@@ -630,7 +659,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
 
   const {
     pumpProgram, startProgram, editProgram, newProgram,
-    provideInput, resumeProgram,
+    provideInput, resumeProgram, chooseProgramMenu,
   } = createPrograms({
     get, set, env, note, persist, syncEnv, gotoScreen,
   });
@@ -723,6 +752,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     const m = st.menu;
     if (!m) return;
     const item = m.tabs[m.tab].items[m.index];
+    if (item?.disabled) return note(item.hint ?? null);
     // The menu closes before the action runs, so an action that wants to stay
     // open — stepping a plot's list, say — needs the state it closed from.
     menuBeforeAction = m;
@@ -820,6 +850,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         return;
       }
       case "prgm":
+        if (arg === "menu") return chooseProgramMenu(action.slice("prgm:menu:".length));
         if (arg === "exec") startProgram(arg2);
         else if (arg === "edit") editProgram(arg2);
         else if (arg === "new") newProgram();
@@ -951,6 +982,15 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
           set({ marks: [], trace: null, cursor: null, message: null, revision: st.revision + 1 });
           return;
         }
+        if (st.target.kind === "table") {
+          set({
+            tbl: { ...st.tbl, ask: [] },
+            entry: { text: "", caret: 0 },
+            revision: st.revision + 1,
+          });
+          persist();
+          return;
+        }
         if (st.screen === "prgm" && st.target.kind === "prgm" && !st.entry.text) {
           // clearing an already-empty line removes it
           const at = st.target.line;
@@ -975,6 +1015,16 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
 
       case "del":
         if (st.menu) return;
+        // On an already-empty line in the Ask table, DEL takes back the last
+        // X value — there is nowhere else for it to act.
+        if (st.target.kind === "table" && !st.entry.text && st.tbl.ask.length) {
+          set({
+            tbl: { ...st.tbl, ask: st.tbl.ask.slice(0, -1) },
+            revision: st.revision + 1,
+          });
+          persist();
+          return;
+        }
         backspace();
         return;
 
@@ -1076,6 +1126,14 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
           const tabs = st.menu.tabs.length;
           return set({ menu: { ...st.menu, tab: (st.menu.tab + dir + tabs) % tabs, index: 0 } });
         }
+        if (st.screen === "tblset" && st.target.kind === "tblset" && st.target.row === 2) {
+          const auto = dir < 0;
+          if (auto !== st.tbl.auto) {
+            set({ tbl: { ...st.tbl, auto }, revision: st.revision + 1 });
+            persist();
+          }
+          return;
+        }
         if (st.screen === "mode") {
           const row = MODE_ROWS[st.row];
           const cur = row.choices.findIndex((c) => c.value === st.modes[row.key]);
@@ -1158,7 +1216,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     history: [],
     ys: freshYs(),
     win: { ...STANDARD_WINDOW },
-    tbl: { start: 0, step: 1, auto: true },
+    tbl: { start: 0, step: 1, auto: true, ask: [] },
     modes: { ...DEFAULT_MODES },
     menu: null,
     trace: null,

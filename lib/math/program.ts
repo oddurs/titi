@@ -15,7 +15,21 @@ export type Status =
   | { kind: "done" }
   | { kind: "error"; message: string; line: number }
   | { kind: "input"; prompt: string; target: string }
+  | { kind: "menu"; title: string; options: { label: string; target: string }[] }
   | { kind: "pause" };
+
+/**
+ * A drawing a program asked for.
+ *
+ * Deliberately not the display layer's `Drawing`: this module is pure maths
+ * and must not know about the device, so it emits coordinates and lets the
+ * store turn them into something the graph can draw.
+ */
+export interface DrawCommand {
+  cmd: "line" | "hline" | "vline" | "circle" | "point" | "text" | "clear";
+  args: number[];
+  text?: string;
+}
 
 interface Block {
   /** index of the matching End */
@@ -71,7 +85,9 @@ function keyword(line: string): string {
   for (const k of [
     "Disp", "Output(", "Input", "Prompt", "If", "Then", "Else", "End",
     "For(", "While", "Repeat", "Lbl", "Goto", "Pause", "Stop", "Return",
-    "ClrHome", "ClrList", "DelVar", "prgm",
+    "ClrHome", "ClrList", "DelVar", "prgm", "Menu(",
+    "Line(", "Horizontal", "Vertical", "Circle(", "Text(", "Pt-On(", "Pt-Off(",
+    "ClrDraw",
   ]) {
     if (
       t === k ||
@@ -126,6 +142,8 @@ export function parseProgram(name: string, body: string): Frame {
 
 export class Interpreter {
   readonly output: string[] = [];
+  /** what the program has asked to be drawn, for the caller to drain */
+  readonly draws: DrawCommand[] = [];
   private stack: Frame[] = [];
   private pending: { target: string; prompt: string } | null = null;
   private steps = 0;
@@ -140,6 +158,18 @@ export class Interpreter {
     private maxSteps = 200_000,
   ) {
     this.stack.push(parseProgram(entry.name, entry.body));
+  }
+
+  /** Continue from the label a Menu( choice named. */
+  chooseMenu(target: string) {
+    const f = this.frame;
+    if (!f) return;
+    const at = f.labels.get(target.trim());
+    if (at === undefined) {
+      this.halted = true;
+      return;
+    }
+    f.pc = at;
   }
 
   private get frame(): Frame | undefined {
@@ -244,6 +274,60 @@ export class Interpreter {
         const prompt = hasPrompt ? unquote(parts[0]) : "?";
         this.pending = { target, prompt };
         return { kind: "input", prompt, target };
+      }
+
+      case "Menu(": {
+        // Menu("TITLE","CHOICE",LBL,"CHOICE",LBL,…) — the caller shows it and
+        // says which label was picked, which is the same shape as Input.
+        const parts = splitTop(argsOf(line, "Menu("));
+        const title = parts.length && isString(parts[0]) ? unquote(parts[0]) : "";
+        const options: { label: string; target: string }[] = [];
+        for (let i = 1; i + 1 < parts.length; i += 2) {
+          options.push({ label: unquote(parts[i]), target: parts[i + 1] });
+        }
+        if (!options.length) throw new CalcError("ERR: SYNTAX");
+        // Land on the line after the menu when the chosen label is resumed.
+        f.pc += 1;
+        return { kind: "menu", title, options };
+      }
+
+      case "ClrDraw":
+        this.draws.push({ cmd: "clear", args: [] });
+        f.pc += 1;
+        return;
+
+      case "Line(":
+      case "Circle(":
+      case "Pt-On(":
+      case "Pt-Off(":
+      case "Horizontal":
+      case "Vertical":
+      case "Text(": {
+        const parts = splitTop(argsOf(line, kw));
+        const nums = (from = 0, to = parts.length) =>
+          parts.slice(from, to).map((a) => {
+            const v = evaluate(a, this.env);
+            if (typeof v !== "number") throw new CalcError("ERR: DATA TYPE");
+            return v;
+          });
+        if (kw === "Text(") {
+          // Text(row, col, thing) — the last argument is what to write.
+          const at = nums(0, 2);
+          const body = parts.slice(2).map((a) => this.value(a)).join("");
+          this.draws.push({ cmd: "text", args: at, text: body });
+        } else if (kw === "Horizontal") {
+          this.draws.push({ cmd: "hline", args: nums() });
+        } else if (kw === "Vertical") {
+          this.draws.push({ cmd: "vline", args: nums() });
+        } else if (kw === "Line(") {
+          this.draws.push({ cmd: "line", args: nums() });
+        } else if (kw === "Circle(") {
+          this.draws.push({ cmd: "circle", args: nums() });
+        } else {
+          this.draws.push({ cmd: "point", args: [...nums(), kw === "Pt-Off(" ? 1 : 0] });
+        }
+        f.pc += 1;
+        return;
       }
 
       case "If": {
@@ -458,6 +542,26 @@ export const SAMPLE_PROGRAMS: ProgramSource[] = [
       'C→B',
       'End',
       'Disp A',
+    ].join("\n"),
+  },
+  {
+    name: "SHAPES",
+    body: [
+      'Menu("DRAW WHAT?","TARGET",A,"WAVE",B)',
+      'Lbl A',
+      'ClrDraw',
+      'For(R,1,5)',
+      'Circle(0,0,R)',
+      'End',
+      'Line(-8,0,8,0)',
+      'Text(1,1,"TARGET")',
+      'Stop',
+      'Lbl B',
+      'ClrDraw',
+      'For(X,-9,9,.5)',
+      'Pt-On(X,4sin(X))',
+      'End',
+      'Text(1,1,"WAVE")',
     ].join("\n"),
   },
 ];

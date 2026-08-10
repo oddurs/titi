@@ -290,6 +290,26 @@ describe("stat plots");
   eq("stepping the mark cycles it on from the default", m.get().plots[0].mark, "dot");
 }
 
+describe("a program's drawings reach the graph");
+{
+  // SHAPES offers a menu, then draws.
+  const d = device().press("prgm").repeat("down", 3).press("enter");
+  ok("the program's menu is the device's menu", d.get().menu !== null);
+  eq("with the program's own title", d.get().menu?.title, "DRAW WHAT?");
+  d.press("down").press("enter");
+  ok("choosing draws", d.get().drawings.length > 20);
+  eq("and closes the menu", d.get().menu, null);
+  const bare = renderPanel(device().press("graph").get());
+  const drawn = renderPanel(d.press("graph").get());
+  ok("which shows on the graph", drawn.count() > bare.count() + 200);
+}
+{
+  const d = device().press("prgm").repeat("down", 3).press("enter").press("enter");
+  const drawings = d.get().drawings;
+  ok("the other branch draws something else", drawings.some((x) => x.kind === "circle"));
+  ok("and labels it", drawings.some((x) => x.kind === "text" && x.label === "TARGET"));
+}
+
 describe("contrast");
 {
   near("5 leaves the panel exactly as drawn", inkGain(5), 1.05);

@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx scripts/test.ts",
     "check": "npm run typecheck && npm run lint && npm test",
-    "test:goldens": "UPDATE_GOLDENS=1 tsx scripts/golden.test.ts"
+    "test:goldens": "UPDATE_GOLDENS=1 tsx scripts/golden.test.ts",
+    "icons": "tsx scripts/icons.ts"
   },
   "dependencies": {
     "next": "16.3.0",

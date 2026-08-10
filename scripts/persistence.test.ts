@@ -1,3 +1,4 @@
+import { SAMPLE_PROGRAMS } from "../lib/math/program";
 import { describe, eq, near, ok, reportIfMain } from "./harness";
 import {
   defaultSave, deserialize, serialize, SCHEMA_VERSION,
@@ -40,7 +41,7 @@ describe("nothing saved");
 {
   const { state, fresh } = deserialize(null);
   ok("starts fresh", fresh);
-  eq("with the sample programs", state.programs.map((p) => p.name), ["QUADRAT", "COLLATZ", "FIB"]);
+  eq("with the sample programs", state.programs.map((p) => p.name), SAMPLE_PROGRAMS.map((p) => p.name));
   eq("and an identity in [A]", state.mats["[A]"].m, [[1, 0], [0, 1]]);
 }
 
@@ -63,7 +64,7 @@ describe("one bad field does not take the rest");
   const { state, rejected } = deserialize(JSON.stringify(good));
   eq("the bad field is named", rejected, ["programs"]);
   near("the good ones are kept", state.win.xmin, -42);
-  eq("and the bad one falls back", state.programs.length, 3);
+  eq("and the bad one falls back", state.programs.length, SAMPLE_PROGRAMS.length);
 }
 {
   const bad = JSON.parse(serialize(defaultSave()));
@@ -117,7 +118,7 @@ describe("an empty program list is a choice, not a gap");
   eq(
     "but a save that never had the field gets the samples",
     deserialize(JSON.stringify(noField)).state.programs.length,
-    3,
+    SAMPLE_PROGRAMS.length,
   );
 }
 

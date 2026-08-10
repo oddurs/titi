@@ -94,7 +94,15 @@ lexer's own tables, so a function added to the engine appears there without
 anyone remembering to add it. It opens with A-lock on, and a letter jumps to
 that letter; pressing it again walks the run.
 
-**Tables and modes.** `TABLE` with `TBLSET`, and `MODE` for Normal/Sci/Eng,
+**Programs.** A TI-BASIC interpreter that suspends rather than blocks, so
+`Input`, `Prompt` and `Pause` work without freezing anything. `Menu(` offers a
+choice using the device's own menu, and `Line(`, `Horizontal`, `Vertical`,
+`Circle(`, `Text(`, `Pt‑On(`, `Pt‑Off(` and `ClrDraw` put the result on the
+graph. `PRGM ▸ SHAPES` is a bundled example of both.
+
+**Tables and modes.** `TABLE` with `TBLSET` — including `Indpnt: Ask`, where
+the X column is yours to type and the rest of the row follows — and `MODE` for
+Normal/Sci/Eng,
 Float/Fix, Radian/Degree, Connected/Dot, grid, labels and coordinates. `2nd ▲`
 and `2nd ▼` set the contrast, which is remembered — alpha on the panel is one
 bit, so contrast scales the ink rather than fading it.
@@ -107,6 +115,15 @@ schema version — a save from an older build is migrated, and a field that no
 longer validates is replaced on its own rather than costing you the rest.
 Drawings are deliberately not saved: a drawing belongs to the window it was
 made in.
+
+### Offline
+
+There is no server behind this, so there is no reason for it to need the
+network twice. It ships a manifest and a service worker: install it to a home
+screen, and after one visit it opens with the radio off. Pages are fetched
+fresh when they can be, so an update lands on the next visit; the build's
+hashed assets are served from the cache at once. The icons are drawn from the
+same 5×7 ROM the panel uses — `npm run icons` regenerates them.
 
 ### Keyboard
 

@@ -1,6 +1,7 @@
 import { describe, eq, near, ok, reportIfMain } from "./harness";
 import { device } from "./device";
 import { evaluate, makeEnv } from "../lib/math/eval";
+import { renderPanel } from "./panel";
 import { ALL_KEYS, ARROW_KEYS, NAV, stepFocus } from "../lib/calc/keys";
 
 /**
@@ -461,6 +462,42 @@ describe("moving focus around the keypad");
     ok(`${n.id} can move down`, typeof down === "string" && down.length > 0);
   }
   eq("the arrow cluster is the last row", stepFocus("d0", 1, 0).length > 0, true);
+}
+
+describe("the table can be asked");
+{
+  const ask = () =>
+    device().press("y=").press("X,T,θ,n").press("x²").press("enter")
+      .press("2nd tblset").repeat("down", 2).press("right").press("2nd table");
+
+  const d = ask();
+  eq("Indpnt goes to Ask", d.get().tbl.auto, false);
+  eq("and the X column becomes an edit field", d.get().target.kind, "table");
+  d.type("3").press("enter");
+  eq("a typed value is kept", d.get().tbl.ask, [3]);
+  d.type("5").press("enter");
+  eq("and the next joins it", d.get().tbl.ask, [3, 5]);
+  eq("with the line cleared for the next", d.get().entry.text, "");
+  d.press("del");
+  eq("del on an empty line takes the last back", d.get().tbl.ask, [3]);
+  d.type("7").press("del");
+  eq("but with something typed it deletes that instead", d.get().tbl.ask, [3]);
+  d.press("clear");
+  eq("clear empties the column", d.get().tbl.ask, []);
+}
+{
+  const d = device().press("2nd tblset").repeat("down", 2).press("right").press("left");
+  eq("left goes back to Auto", d.get().tbl.auto, true);
+  const auto = d.press("2nd table");
+  eq("and the table stops being an edit field", auto.get().target.kind, "home");
+}
+{
+  // The rows must actually be evaluated, not just listed.
+  const d = device().press("y=").press("X,T,θ,n").press("x²").press("enter")
+    .press("2nd tblset").repeat("down", 2).press("right").press("2nd table")
+    .type("3").press("enter");
+  const p = renderPanel(d.get());
+  ok("the asked X appears with its answer", p.transcript.some((l) => l.includes("3") && l.includes("9")));
 }
 
 reportIfMain(import.meta.url);

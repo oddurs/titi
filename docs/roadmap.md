@@ -27,7 +27,7 @@ day with tests, `L` needs a design decision first.
 | 7 | Distributions and probability — Poisson, geometric, t, χ², F, invT, and the counting functions | `88639e0` |
 | 8 | Programs that react — getKey, a placed Output(, IS>( and DS<(, and Input on the graph | `2516be5` |
 | 9 | The graph's last controls — a FORMAT screen, ZoomSto and ZoomRcl, DrawF, DrawInv, Shade(, and CALC in every mode | `997cf6b` |
-| 10 | Editing, memory and the engine's leftovers — error Goto, a real RCL, Mem Mgmt, the logic connectives, remainder(, the CPX tab | pending |
+| 10 | Editing, memory and the engine's leftovers — error Goto, a real RCL, Mem Mgmt, the logic connectives, remainder(, the CPX tab | `63835b9` |
 
 ---
 

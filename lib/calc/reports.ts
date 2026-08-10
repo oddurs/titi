@@ -2,14 +2,17 @@ import { CalcError, type Env } from "../math/eval";
 import { solveEquation } from "../math/solver";
 import { solverRows } from "./layout";
 import {
-  expReg, linReg, lnReg, logisticReg, oneVarStats, pwrReg, quadReg, sinReg,
-  twoVarStats, type StatReport,
+  cubicReg, expReg, linReg, lnReg, logisticReg, medMedReg, oneVarStats, pwrReg,
+  quadReg, quartReg, sinReg, twoVarStats, type StatReport,
 } from "../math/stats";
 import type { EditTarget } from "./types";
 import type { CalcState } from "./store";
 
 /** Every regression writes its fit into Y₁, so they share one code path. */
-const REGRESSIONS: Record<string, (xs: number[], ys: number[]) => StatReport> = {
+const REGRESSIONS: Record<
+  string,
+  (xs: number[], ys: number[], freq?: number[]) => StatReport
+> = {
   linreg: linReg,
   quadreg: quadReg,
   expreg: expReg,
@@ -17,6 +20,9 @@ const REGRESSIONS: Record<string, (xs: number[], ys: number[]) => StatReport> = 
   pwrreg: pwrReg,
   sinreg: sinReg,
   logisticreg: logisticReg,
+  cubicreg: cubicReg,
+  quartreg: quartReg,
+  medmed: medMedReg,
 };
 
 /**
@@ -43,17 +49,21 @@ function runStat(kind: string) {
   const st = get();
   const l1 = st.lists[0];
   const l2 = st.lists[1];
+  // A frequency list weights every calculation until it is stepped back to
+  // none, which is why it lives in state rather than being asked for each time.
+  const index = st.statFreq ? "₁₂₃₄₅₆".indexOf(st.statFreq.slice(-1)) : -1;
+  const freq = index >= 0 ? st.lists[index] : undefined;
   set({ menu: null });
   try {
     if (kind === "1var") {
       if (l1.length < 1) throw new CalcError("ERR: DIM MISMATCH");
-      set({ statReport: oneVarStats(l1), screen: "home" });
+      set({ statReport: oneVarStats(l1, freq), screen: "home" });
     } else if (kind === "2var") {
       if (l1.length < 2 || l1.length !== l2.length) throw new CalcError("ERR: DIM MISMATCH");
-      set({ statReport: twoVarStats(l1, l2), screen: "home" });
+      set({ statReport: twoVarStats(l1, l2, freq), screen: "home" });
     } else if (REGRESSIONS[kind]) {
       if (l1.length < 2 || l1.length !== l2.length) throw new CalcError("ERR: DIM MISMATCH");
-      const report = REGRESSIONS[kind](l1, l2);
+      const report = REGRESSIONS[kind](l1, l2, freq);
       const ys = st.ys.map((y, i) => (i === 0 ? { ...y, expr: report.expr!, on: true } : y));
       set({ statReport: report, ys, screen: "home", revision: st.revision + 1 });
       syncEnv({ ys });

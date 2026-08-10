@@ -104,6 +104,8 @@ export interface CalcState {
   /** what the user drew on the graph by hand; see the type for why it is not saved */
   drawings: Drawing[];
   plots: StatPlot[];
+  /** the list weighting L₁ in STAT CALC, or null for one count each */
+  statFreq: string | null;
   lists: number[][];
   mats: Record<string, Matrix>;
   programs: ProgramSource[];
@@ -270,8 +272,10 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
 
   /** What a plot is set to, for the toast that follows an edit. */
   function plotSummary(p: StatPlot, slot: number): string {
-    const lists = p.type === "hist" || p.type === "box" ? p.xList : `${p.xList},${p.yList}`;
-    return `Plot${slot + 1} ${p.type} ${lists} ${p.mark}`;
+    const oneList = p.type === "hist" || p.type === "box" || p.type === "modbox";
+    const lists = oneList ? p.xList : `${p.xList},${p.yList}`;
+    const freq = p.freqList ? ` freq ${p.freqList}` : "";
+    return `Plot${slot + 1} ${p.type} ${lists} ${p.mark}${freq}`;
   }
 
   /** null means unparseable; undefined means the field was left blank. */
@@ -785,6 +789,17 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       case "menu":
         openMenu(arg);
         return;
+      case "freq": {
+        // None, then L₁ through L₆, then back to none — the same stepping the
+        // plots use for their own lists.
+        const cycle = [null, "L₁", "L₂", "L₃", "L₄", "L₅", "L₆"];
+        const next = cycle[(cycle.indexOf(st.statFreq) + 1) % cycle.length];
+        set({ statFreq: next, menu: menuBeforeAction, revision: st.revision + 1 });
+        note(next ? `Freq ${next}` : "Freq none");
+        persist();
+        return;
+      }
+
       case "contrast": {
         const contrast = clamp(st.modes.contrast + (arg === "up" ? 1 : -1), 0, 9);
         if (contrast === st.modes.contrast) return note(`Contrast ${contrast}`);
@@ -828,12 +843,17 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
             case "xlist": return { ...p, xList: step(LISTS, p.xList) };
             case "ylist": return { ...p, yList: step(LISTS, p.yList) };
             case "mark": return { ...p, mark: step(MARKS, p.mark) };
+            case "freq": {
+              const cycle: (string | null)[] = [null, ...LISTS];
+              return { ...p, freqList: cycle[(cycle.indexOf(p.freqList) + 1) % cycle.length] };
+            }
             default: return p;
           }
         });
         // Choosing a list or a mark is editing the plot, not asking to see it;
         // only the switches and the types leave for the graph.
-        const staying = arg === "xlist" || arg === "ylist" || arg === "mark";
+        const staying =
+          arg === "xlist" || arg === "ylist" || arg === "mark" || arg === "freq";
         set({
           plots,
           menu: staying ? menuBeforeAction : null,
@@ -1184,6 +1204,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
           prgmLines: [],
           prgmName: "",
           plots: freshPlots(),
+          statFreq: null,
           marks: [],
           trace: null,
           cursor: null,
@@ -1223,6 +1244,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     marks: [],
     drawings: [],
     plots: freshPlots(),
+    statFreq: null,
     lists: Array.from({ length: 6 }, () => [] as number[]),
     mats: { "[A]": MX.identity(2) },
     programs: SAMPLE_PROGRAMS.map((p) => ({ ...p })),

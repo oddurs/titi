@@ -54,7 +54,12 @@ describe("the sprints run in order without gaps");
   const sorted = [...numbers].sort((a, b) => a - b);
   eq("they are written in order", numbers, sorted);
   eq("and nothing is skipped", sorted, sorted.map((_, i) => sorted[0] + i));
-  ok("the first one follows what has shipped", sorted[0] === 6, `starts at ${sorted[0]}`);
+  // The plan starts where the shipped list stops — otherwise a sprint can be
+  // finished and quietly left on the roadmap, or dropped without shipping.
+  const shipped = rows(ROADMAP, 3)
+    .filter((r) => r.section === "Shipped" && /^\d+$/.test(r.cells[0]))
+    .map((r) => Number(r.cells[0]));
+  eq("the plan starts where the shipped list stops", sorted[0], Math.max(...shipped) + 1);
 }
 
 describe("nothing is scheduled that the spec has not admitted to");

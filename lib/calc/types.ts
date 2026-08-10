@@ -143,10 +143,12 @@ export interface Drawing {
 
 export interface StatPlot {
   on: boolean;
-  /** hist and box read xList alone; scatter and line need both */
-  type: "scatter" | "line" | "hist" | "box";
+  /** hist and the box plots read xList alone; scatter and line need both */
+  type: "scatter" | "line" | "hist" | "box" | "modbox";
   xList: string;
   yList: string;
+  /** a list weighting xList, or null for one count each */
+  freqList: string | null;
   color: number;
   mark: "box" | "cross" | "dot";
 }

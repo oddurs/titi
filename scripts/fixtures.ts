@@ -131,21 +131,53 @@ export const FIXTURES: Record<string, () => Device> = {
     device()
       .press("stat").press("enter")
       .type("2").press("enter").type("4").press("enter").type("6").press("enter")
-      .press("stat").press("right").press("enter"),
+      .press("stat").press("right").choose("1‑Var Stats"),
 
   "graph-histogram": () =>
     withList([1, 1, 2, 2, 2, 3, 5, 8])
-      .press("2nd stat plot").repeat("down", 3).press("enter"),
+      .press("2nd stat plot").choose("Histogram"),
 
   "graph-boxplot": () =>
     withList([1, 2, 3, 4, 5, 6, 7, 12])
-      .press("2nd stat plot").repeat("down", 4).press("enter"),
+      .press("2nd stat plot").choose("Boxplot"),
+
+  "graph-modbox": () =>
+    withList([1, 2, 3, 4, 5, 6, 7, 22])
+      .press("2nd stat plot").choose("ModBoxplot"),
+
+  "graph-weighted-hist": () =>
+    device().press("stat").press("enter")
+      .type("1").press("enter").type("2").press("enter").type("3").press("enter")
+      .press("right")
+      .type("1").press("enter").type("4").press("enter").type("2").press("enter")
+      .press("2nd quit")
+      .press("2nd stat plot").choose("Histogram")
+      .press("2nd stat plot").choose("Freq ▸").choose("Freq ▸").press("graph"),
+
+  "stat-report-weighted": () =>
+    device().press("stat").press("enter")
+      .type("2").press("enter").type("5").press("enter").type("9").press("enter")
+      .press("right")
+      .type("3").press("enter").type("1").press("enter").type("2").press("enter")
+      .press("2nd quit")
+      .press("stat").press("right").choose("Freq ▸").press("2nd quit")
+      .press("stat").press("right").choose("1‑Var Stats"),
+
+  // Nine points on y = 2x+1 with the last thrown far off: enough for three
+  // groups of three, which is where the resistant line earns its name.
+  "stat-medmed": () => {
+    let d = device().press("stat").press("enter");
+    for (const x of [1, 2, 3, 4, 5, 6, 7, 8, 9]) d = d.type(String(x)).press("enter");
+    d = d.press("right");
+    for (const y of [3, 5, 7, 9, 11, 13, 15, 17, 200]) d = d.type(String(y)).press("enter");
+    return d.press("2nd quit").press("stat").press("right").choose("Med‑Med");
+  },
 
   "graph-scatter": () =>
     withList([1, 2, 3, 4]).press("stat").press("enter").press("right")
       .type("2").press("enter").type("5").press("enter")
       .type("7").press("enter").type("11").press("enter")
-      .press("2nd quit").press("2nd stat plot").press("down").press("enter"),
+      .press("2nd quit").press("2nd stat plot").choose("Scatter"),
 
   "matrix-editor": () =>
     device().press("2nd matrix").repeat("right", 2).press("enter"),

@@ -1,12 +1,25 @@
 import { describe, eq, near, ok, reportIfMain, throws } from "./harness";
 import {
   expReg, linReg, lnReg, oneVarStats, pwrReg, quadReg, twoVarStats,
-  quartiles, sinReg, logisticReg,
+  quartiles, sinReg, logisticReg, cubicReg, quartReg, weightsFor, expandBy,
+  medMedReg,
 } from "../lib/math/stats";
 
-/** Pull a labelled row out of a report. */
+/**
+ * Pull a labelled row out of a report, as a number.
+ *
+ * Report values are formatted for the panel, which writes a leading `.875`
+ * without its zero and spells the exponent with the ROM's own `ᴇ` — neither of
+ * which `Number` understands.
+ */
 const val = (r: { rows: { label: string; value: string }[] }, label: string) =>
-  Number(r.rows.find((x) => x.label === label)?.value.replace(/^\./, "0."));
+  Number(
+    r.rows
+      .find((x) => x.label === label)
+      ?.value.replace(/^\./, "0.")
+      .replace(/^-\./, "-0.")
+      .replace("ᴇ", "e"),
+  );
 
 describe("1-Var Stats");
 const one = oneVarStats([2, 4, 4, 4, 5, 5, 7, 9]);
@@ -152,6 +165,109 @@ describe("LogisticReg recovers a curve it was given");
   near("a steeper curve too", Number(val(r, "b")), 1.2, 1e-3);
   throws("a zero reading has no logit", () => logisticReg([1, 2, 3], [1, 0, 3]));
   throws("and two points are not a curve", () => logisticReg([1, 2], [1, 2]));
+}
+
+describe("polynomial fits at every degree");
+{
+  // y = 2x³ - x² + 3x - 4, exactly.
+  const xs = [-3, -2, -1, 0, 1, 2, 3, 4];
+  const ys = xs.map((x) => 2 * x ** 3 - x ** 2 + 3 * x - 4);
+  const r = cubicReg(xs, ys);
+  near("a", Number(val(r, "a")), 2, 1e-6);
+  near("b", Number(val(r, "b")), -1, 1e-6);
+  near("c", Number(val(r, "c")), 3, 1e-6);
+  near("d", Number(val(r, "d")), -4, 1e-6);
+  near("and it fits exactly", Number(val(r, "R²")), 1, 1e-9);
+  eq("the expression is written in X", r.expr?.includes("X³"), true);
+  ok("with the signs folded", !(r.expr ?? "").includes("+-"), r.expr);
+}
+{
+  const xs = [-2, -1, 0, 1, 2, 3, 4, 5];
+  const ys = xs.map((x) => x ** 4 - 2 * x ** 2 + 1);
+  const r = quartReg(xs, ys);
+  near("a quartic comes back too", Number(val(r, "a")), 1, 1e-5);
+  near("with its own coefficients", Number(val(r, "c")), -2, 1e-5);
+  near("and e", Number(val(r, "e")), 1, 1e-5);
+}
+{
+  // A quadratic fitted as a cubic should put nothing in the x³ term.
+  const xs = [0, 1, 2, 3, 4, 5];
+  const ys = xs.map((x) => 3 * x * x + 1);
+  near("an over-specified fit leaves the top term empty",
+    Number(val(cubicReg(xs, ys), "a")), 0, 1e-6);
+  near("and the quadratic is still exact",
+    Number(val(quadReg(xs, ys), "a")), 3, 1e-9);
+}
+throws("too few points for the degree", () => quartReg([1, 2, 3], [1, 2, 3]));
+throws("and a system with no answer says so", () => cubicReg([2, 2, 2, 2], [1, 2, 3, 4]));
+
+describe("Med-Med resists what LinReg chases");
+{
+  // A clean line, so both fits should agree.
+  const xs = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const ys = xs.map((x) => 2 * x + 1);
+  const med = medMedReg(xs, ys);
+  near("on clean data the slope is the slope", Number(val(med, "a")), 2, 1e-9);
+  near("and so is the intercept", Number(val(med, "b")), 1, 1e-9);
+}
+{
+  // The same line with the last point thrown far off. It has to be at an end:
+  // an outlier at the mean of x lifts the intercept without tilting the slope,
+  // so least squares would survive it and there would be nothing to show.
+  const xs = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const ys = xs.map((x) => 2 * x + 1);
+  ys[8] = 200;
+  const med = Number(val(medMedReg(xs, ys), "a"));
+  const lin = Number(val(linReg(xs, ys), "a"));
+  near("the resistant slope barely moves", med, 2, 1e-9);
+  ok("while least squares is dragged", Math.abs(lin - 2) > 1, `${lin}`);
+  ok("which is the whole point of it", Math.abs(med - 2) < Math.abs(lin - 2));
+}
+{
+  const xs = [1, 2, 3, 4, 5, 6];
+  const ys = [3, 5, 7, 9, 11, 13];
+  eq("the fit is stored as an expression", medMedReg(xs, ys).expr, "2X+1");
+  throws("two points are not three groups", () => medMedReg([1, 2], [1, 2]));
+  throws("and a vertical run has no slope", () => medMedReg([2, 2, 2], [1, 2, 3]));
+}
+
+describe("frequency lists");
+{
+  eq("no list means every value counts once", weightsFor(3), [1, 1, 1]);
+  eq("a list is taken as given", weightsFor(2, [3, 4]), [3, 4]);
+  throws("one of the wrong length is refused", () => weightsFor(3, [1, 2]));
+  throws("so is a negative count", () => weightsFor(2, [1, -1]));
+  throws("and one that counts nothing", () => weightsFor(2, [0, 0]));
+  eq("expanding repeats each value", expandBy([5, 7], [1, 3]), [5, 7, 7, 7]);
+  eq("and without a list it is the values", expandBy([5, 7]), [5, 7]);
+}
+{
+  // A weighted list must agree with the same data written out longhand.
+  const values = [2, 5, 9];
+  const counts = [3, 1, 2];
+  const spelled = [2, 2, 2, 5, 9, 9];
+  const weighted = oneVarStats(values, counts);
+  const longhand = oneVarStats(spelled);
+  for (const label of ["x̄", "Σx", "Σx²", "Sx", "σx", "n", "minX", "Q₁", "Med", "Q₃", "maxX"]) {
+    near(`${label} matches the data written out`, val(weighted, label), val(longhand, label), 1e-9);
+  }
+}
+{
+  const xs = [1, 2, 3];
+  const ys = [2, 4, 6];
+  const w = [1, 1, 5];
+  near("a weighted line still finds the line", Number(val(linReg(xs, ys, w), "a")), 2, 1e-9);
+  // Weighting the ends differently must actually move a fit that is not exact.
+  const off = [2, 4, 7];
+  const plain = Number(val(linReg(xs, off), "a"));
+  const heavy = Number(val(linReg(xs, off, [1, 1, 10]), "a"));
+  ok("and weight changes one that is not exact", Math.abs(heavy - plain) > 0.01, `${plain} vs ${heavy}`);
+  near("a two-variable summary counts the weights",
+    Number(val(twoVarStats(xs, ys, [2, 2, 2]), "n")), 6, 1e-9);
+  near("a weighted quadratic is still exact",
+    Number(val(quadReg([0, 1, 2, 3], [1, 2, 5, 10], [2, 1, 1, 3]), "a")), 1, 1e-9);
+  throws("a frequency list of the wrong length is refused",
+    () => oneVarStats([1, 2, 3], [1, 2]));
 }
 
 reportIfMain(import.meta.url);

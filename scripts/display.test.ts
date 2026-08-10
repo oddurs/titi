@@ -246,13 +246,13 @@ describe("stat plots");
     for (const v of [2, 4, 6, 8, 10, 12]) d = d.type(String(v)).press("enter");
     return d.press("2nd quit");
   };
-  const plotMenu = (item: number) =>
-    withData().press("2nd stat plot").repeat("down", item).press("enter");
+  const plotMenu = (label: string) =>
+    withData().press("2nd stat plot").choose(label);
 
-  const scatter = renderPanel(plotMenu(1).get());
-  const line = renderPanel(plotMenu(2).get());
-  const hist = renderPanel(plotMenu(3).get());
-  const box = renderPanel(plotMenu(4).get());
+  const scatter = renderPanel(plotMenu("Scatter").get());
+  const line = renderPanel(plotMenu("xyLine").get());
+  const hist = renderPanel(plotMenu("Histogram").get());
+  const box = renderPanel(plotMenu("Boxplot").get());
 
   ok("a scatter draws", scatter.count() > 400);
   ok("a line joins the same points, so it lights more", line.count() > scatter.count());
@@ -272,7 +272,7 @@ describe("stat plots");
   const load = () => {
     let d = device().press("stat").press("enter");
     for (const v of [1, 1, 2, 2, 3, 8]) d = d.type(String(v)).press("enter");
-    return d.press("2nd quit").press("2nd stat plot").repeat("down", 3).press("enter");
+    return d.press("2nd quit").press("2nd stat plot").choose("Histogram");
   };
   const narrow = renderPanel(load().get());
   const wide = renderPanel(
@@ -281,13 +281,65 @@ describe("stat plots");
   ok("changing Xscl rebins the histogram", narrow.digest() !== wide.digest());
 }
 {
-  const d = device()
-    .press("2nd stat plot").repeat("down", 5).press("enter");
+  const d = device().press("2nd stat plot").choose("Xlist ▸");
   eq("stepping the x list moves to L₂", d.get().plots[0].xList, "L₂");
   ok("and says so without leaving the menu", d.get().menu !== null);
   ok("with a summary of the plot", (d.get().message ?? "").includes("L₂"));
-  const m = d.press("down").press("down").press("enter");
+  const m = d.choose("Mark ▸");
   eq("stepping the mark cycles it on from the default", m.get().plots[0].mark, "dot");
+}
+
+describe("frequency lists and modified box plots");
+{
+  // L₁ = the values, L₂ = how many times each occurred.
+  const loaded = () => {
+    let d = device().press("stat").press("enter");
+    for (const v of [1, 2, 3]) d = d.type(String(v)).press("enter");
+    d = d.press("right");
+    for (const v of [1, 1, 9]) d = d.type(String(v)).press("enter");
+    return d.press("2nd quit");
+  };
+
+  const plain = renderPanel(loaded().press("2nd stat plot").choose("Histogram").get());
+  const weighted = renderPanel(
+    loaded().press("2nd stat plot").choose("Histogram")
+      .press("2nd stat plot").choose("Freq ▸").choose("Freq ▸").press("graph").get(),
+  );
+  ok("a frequency list changes the histogram", plain.digest() !== weighted.digest());
+  ok("and makes it taller", weighted.count() > plain.count());
+}
+{
+  const withOutlier = () => {
+    let d = device().press("stat").press("enter");
+    for (const v of [1, 2, 3, 4, 5, 40]) d = d.type(String(v)).press("enter");
+    return d.press("2nd quit");
+  };
+  const box = renderPanel(withOutlier().press("2nd stat plot").choose("Boxplot").get());
+  const mod = renderPanel(withOutlier().press("2nd stat plot").choose("ModBoxplot").get());
+  ok("a modified box plot draws differently", box.digest() !== mod.digest());
+
+  // The plain plot runs its whisker all the way out to 40; the modified one
+  // stops at 5 and puts a mark out there instead, so the run of lit dots
+  // between the box and the far point is broken.
+  const rowOf = (p: ReturnType<typeof renderPanel>) => {
+    const counts = new Map<number, number>();
+    for (const k of p.dots.keys()) {
+      const y = Number(k.split(",")[1]);
+      if (y < 40) counts.set(y, (counts.get(y) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0;
+  };
+  const litOn = (p: ReturnType<typeof renderPanel>, y: number) =>
+    [...p.dots.keys()].filter((k) => Number(k.split(",")[1]) === y).length;
+  ok("the plain whisker reaches further", litOn(box, rowOf(box)) > litOn(mod, rowOf(mod)));
+}
+{
+  const d = device().press("stat").press("right").choose("Freq ▸");
+  eq("the frequency list steps to L₁", d.get().statFreq, "L₁");
+  ok("without leaving the menu", d.get().menu !== null);
+  const back = d.choose("Freq ▸").choose("Freq ▸").choose("Freq ▸")
+    .choose("Freq ▸").choose("Freq ▸").choose("Freq ▸");
+  eq("and comes back round to none", back.get().statFreq, null);
 }
 
 describe("a program's drawings reach the graph");

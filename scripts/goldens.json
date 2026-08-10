@@ -351,6 +351,68 @@
       "-8"
     ]
   },
+  "graph-modbox": {
+    "digest": "0490106a",
+    "transcript": [
+      "GRAPH RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8"
+    ]
+  },
+  "graph-weighted-hist": {
+    "digest": "59229ea6",
+    "transcript": [
+      "GRAPH RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8",
+      "Plot1 hist L₁ cross freq L₂"
+    ]
+  },
+  "stat-report-weighted": {
+    "digest": "6e86e5e7",
+    "transcript": [
+      "HOME RAD",
+      "1‑Var Stats",
+      "x̄=6.875",
+      "Σx=110",
+      "Σx²=862",
+      "Sx=2.655183609",
+      "σx=2.570870475",
+      "n=16",
+      "minX=2",
+      "Q₁=5",
+      "Med=9",
+      "Q₃=9",
+      "maxX=9",
+      "> Freq L₁"
+    ]
+  },
+  "stat-medmed": {
+    "digest": "58fb5bb8",
+    "transcript": [
+      "HOME RAD",
+      "Med-Med  y = ax + b",
+      "a=2",
+      "b=1",
+      "R²=-.015628014",
+      "→=Y₁",
+      ">"
+    ]
+  },
   "graph-scatter": {
     "digest": "899ea34c",
     "transcript": [

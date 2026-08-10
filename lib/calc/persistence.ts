@@ -36,6 +36,7 @@ export interface SavedState {
   tbl: TableSetup;
   lists: number[][];
   plots: StatPlot[];
+  statFreq: string | null;
   mats: Record<string, Matrix>;
   programs: ProgramSource[];
   solver: SolverState;
@@ -51,6 +52,7 @@ export function defaultSave(): SavedState {
     tbl: { start: 0, step: 1, auto: true, ask: [] },
     lists: Array.from({ length: 6 }, () => [] as number[]),
     plots: freshPlots(),
+    statFreq: null,
     mats: { "[A]": identity(2) },
     programs: SAMPLE_PROGRAMS.map((p) => ({ ...p })),
     solver: {
@@ -73,6 +75,7 @@ export function serialize(state: SavedState): string {
     tbl: state.tbl,
     lists: state.lists,
     plots: state.plots,
+    statFreq: state.statFreq,
     mats: state.mats,
     programs: state.programs,
     solver: state.solver,
@@ -149,6 +152,8 @@ const validTbl = (v: unknown) =>
 const validPlots = (v: unknown) =>
   Array.isArray(v) && v.every((p) => isObject(p) && typeof p.on === "boolean");
 
+const validFreq = (v: unknown) => v === null || (isStr(v) && /^L[₁-₆]$/.test(v));
+
 export interface LoadResult {
   state: SavedState;
   /** fields that failed to validate and were replaced with defaults */
@@ -202,6 +207,7 @@ export function deserialize(raw: string | null): LoadResult {
     tbl: take("tbl", validTbl),
     lists: take("lists", validLists),
     plots: take("plots", validPlots),
+    statFreq: take("statFreq", validFreq),
     mats: take("mats", validMats),
     programs: take("programs", validPrograms),
     solver: take("solver", validSolver),
@@ -213,6 +219,8 @@ export function deserialize(raw: string | null): LoadResult {
   if (data.programs === undefined) state.programs = base.programs;
   // Ask mode arrived after the first saves; an older tbl has no list.
   if (!Array.isArray(state.tbl.ask)) state.tbl = { ...state.tbl, ask: [] };
+  // So did the plots' frequency lists.
+  state.plots = state.plots.map((p) => ({ ...p, freqList: p.freqList ?? null }));
 
   return { state, rejected, fresh: false };
 }

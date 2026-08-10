@@ -143,10 +143,10 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | `SinReg` | `a sin(bx+c)+d`, fitted by searching the frequency | done | `scripts/stats.test.ts` |
 | `SortA(` `SortD(` | Sort a list, writing back through it | done | `lib/math/eval.ts` |
 | Stat plots | Three, each scatter, xyLine, histogram or box plot over any pair of lists | done | `lib/display/graph.ts` |
-| Modified box plot | Outliers marked beyond 1.5 IQR | todo | the plain box plot is built |
-| `CubicReg` `QuartReg` | — | todo | `QuadReg` already generalises |
-| `Med-Med` | — | todo | — |
-| Frequency lists | A second list weighting the first | todo | — |
+| Modified box plot | Whiskers stop at 1.5 IQR and the outliers beyond are drawn with the plot's mark | done | `lib/display/graph.ts` |
+| `CubicReg` `QuartReg` | One polynomial fit at any degree, so all three share a solve | done | `lib/math/stats.ts` |
+| `Med-Med` | The resistant line: median of three groups, fitted through the outer two | done | `scripts/stats.test.ts` |
+| Frequency lists | A second list weighting the first, through every statistic and both plots | done | `lib/math/stats.ts` |
 | `STAT TESTS` | Inference is a different product | out-of-scope | — |
 
 ## DISTR

@@ -130,6 +130,12 @@ export function renderGraph(pen: Pen, g: GraphInput) {
     const xs = listByName(g.lists, p.xList);
     const ink = PLOT_COLORS[p.color % PLOT_COLORS.length];
     if (!xs.length) continue;
+    // A frequency list says how many times each value occurred. It only makes
+    // sense alongside a matching x list; a mismatched one is ignored rather
+    // than allowed to draw something wrong.
+    const rawFreq = p.freqList ? listByName(g.lists, p.freqList) : [];
+    const freq = rawFreq.length === xs.length ? rawFreq : null;
+    const weightAt = (i: number) => (freq ? freq[i] : 1);
 
     if (p.type === "hist") {
       // Xscl is the bin width, and the bars are counted from Xmin — the same
@@ -138,10 +144,10 @@ export function renderGraph(pen: Pen, g: GraphInput) {
       const width = win.xscl > 0 ? win.xscl : niceStep(spanX, 10);
       const bins = Math.min(200, Math.ceil(spanX / width));
       const counts = new Array<number>(bins).fill(0);
-      for (const v of xs) {
+      xs.forEach((v, i) => {
         const k = Math.floor((v - win.xmin) / width);
-        if (k >= 0 && k < bins) counts[k] += 1;
-      }
+        if (k >= 0 && k < bins) counts[k] += weightAt(i);
+      });
       const base = Math.round(py(Math.max(0, win.ymin)));
       for (let k = 0; k < bins; k++) {
         if (!counts[k]) continue;
@@ -155,19 +161,38 @@ export function renderGraph(pen: Pen, g: GraphInput) {
       continue;
     }
 
-    if (p.type === "box") {
+    if (p.type === "box" || p.type === "modbox") {
       const band = Math.max(9, Math.floor(h / 8));
       const mid = top + Math.round(band * (boxSlot + 0.5));
       boxSlot += 1;
       const half = Math.max(2, Math.floor(band / 3));
-      const five = quartiles(xs);
-      const [x0, x1, x2, x3, x4] = [five.min, five.q1, five.med, five.q3, five.max]
+      const five = quartiles(xs, freq ?? undefined);
+
+      // A modified box plot stops its whiskers at the last value within one
+      // and a half interquartile ranges and draws what is beyond as points —
+      // which is the only way a box plot shows you its outliers rather than
+      // swallowing them into a long whisker.
+      let lo = five.min;
+      let hi = five.max;
+      let outliers: number[] = [];
+      if (p.type === "modbox") {
+        const iqr = five.q3 - five.q1;
+        const floor = five.q1 - 1.5 * iqr;
+        const ceiling = five.q3 + 1.5 * iqr;
+        const inside = xs.filter((v) => v >= floor && v <= ceiling);
+        outliers = xs.filter((v) => v < floor || v > ceiling);
+        lo = inside.length ? Math.min(...inside) : five.q1;
+        hi = inside.length ? Math.max(...inside) : five.q3;
+      }
+
+      const [x0, x1, x2, x3, x4] = [lo, five.q1, five.med, five.q3, hi]
         .map((v) => Math.round(px(v)));
       // whiskers
       pen.hline(x0, x1, mid, ink);
       pen.hline(x3, x4, mid, ink);
       pen.vline(x0, mid - half + 1, mid + half - 1, ink);
       pen.vline(x4, mid - half + 1, mid + half - 1, ink);
+      for (const v of outliers) drawMark(pen, Math.round(px(v)), mid, p.mark, ink);
       // the box, with the median across it
       pen.hline(x1, x3, mid - half, ink);
       pen.hline(x1, x3, mid + half, ink);
@@ -185,6 +210,8 @@ export function renderGraph(pen: Pen, g: GraphInput) {
       }
     }
     for (let i = 0; i < n; i++) {
+      // A weight of zero means the point was not observed, so it is not drawn.
+      if (weightAt(i) === 0) continue;
       drawMark(pen, Math.round(px(xs[i])), Math.round(py(ys[i])), p.mark, ink);
     }
   }

@@ -23,23 +23,9 @@ day with tests, `L` needs a design decision first.
 | 4 | The long tail — LIST OPS, a generated catalog, contrast, the keypad as one tab stop | `ac610ce` |
 | 5 | The things that were stored and ignored — `Indpnt: Ask`, programs that ask and draw, offline and installable | `bfc35e8` |
 | — | The spec itself, and a test that keeps it honest | `bc417cb` |
+| 6 | The rest of the statistics — frequency lists, Med-Med, CubicReg and QuartReg, modified box plots | pending |
 
 ---
-
-## Sprint 6 — The rest of the statistics
-
-**Why now.** Statistics is the weakest half of the device relative to how much
-of it we already have: six lists, seven regressions and four plot types, but no
-weighting, no resistant fit, and a box plot that hides its outliers. Every item
-here is small on its own and shares the same test fixtures, so they are cheaper
-together than apart.
-
-| Spec row | What it takes | Size |
-| --- | --- | --- |
-| Frequency lists | A second list weighting the first, threaded through `oneVarStats`, the regressions and the histogram. The plumbing is the work; the maths is a weighted sum. | M |
-| `Med-Med` | Split the data in three by x, take the median point of each, fit through the outer two and shift toward the middle. Resistant to the outliers `LinReg` chases. | M |
-| `CubicReg` `QuartReg` | `quadReg` already builds and solves a normal-equation system; this widens it to degree 3 and 4 and guards the conditioning. | S |
-| Modified box plot | Whiskers stop at the last point within 1.5 IQR and the rest are drawn with the plot's mark. A second plot type beside `box`, not a replacement. | S |
 
 ## Sprint 7 — Distributions and probability
 

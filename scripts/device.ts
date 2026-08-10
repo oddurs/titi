@@ -42,6 +42,13 @@ export interface Device {
   repeat(key: string, n: number): Device;
   /** Type a run of digits and operators, e.g. "7/8" or "2^10". */
   type(text: string): Device;
+  /**
+   * Pick an item out of the open menu by the label printed on it, walking
+   * there with the arrows the way a person would. Addressing by label rather
+   * than by how many times to press down means adding a menu item does not
+   * quietly re-point every test that walks past it.
+   */
+  choose(label: string): Device;
   /** The current entry line. */
   entry(): string;
   /** The last answer on the tape. */
@@ -79,6 +86,20 @@ export function device(): Device {
     get: () => store.getState(),
     press(...keys) {
       for (const k of keys) hit(k);
+      return d;
+    },
+    choose(label) {
+      const m = store.getState().menu;
+      if (!m) throw new Error(`no menu is open to choose ${JSON.stringify(label)} from`);
+      const same = (a: string) => a.replace(/‑/g, "-") === label.replace(/‑/g, "-");
+      const tab = m.tabs.findIndex((t) => t.items.some((i) => same(i.label)));
+      if (tab < 0) throw new Error(`no menu item labelled ${JSON.stringify(label)}`);
+      for (let k = (tab - m.tab + m.tabs.length) % m.tabs.length; k > 0; k--) hit("right");
+      const items = store.getState().menu!.tabs[tab].items;
+      const index = items.findIndex((i) => same(i.label));
+      const from = store.getState().menu!.index;
+      for (let k = (index - from + items.length) % items.length; k > 0; k--) hit("down");
+      hit("enter");
       return d;
     },
     repeat(key, n) {

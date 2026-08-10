@@ -389,7 +389,7 @@ describe("the new regressions from the keypad");
   for (const x of xs) d = d.type(String(x)).press("enter");
   d = d.press("right");
   for (const y of ys) d = d.type(y.toFixed(4)).press("enter");
-  d = d.press("2nd quit").press("stat").press("right").repeat("down", 7).press("enter");
+  d = d.press("2nd quit").press("stat").press("right").choose("Logistic");
 
   const report = d.get().statReport;
   ok("a report comes back", report !== null);
@@ -405,7 +405,7 @@ describe("the new regressions from the keypad");
   for (const x of xs) d = d.type(x.toFixed(3)).press("enter");
   d = d.press("right");
   for (const y of ys) d = d.type(y.toFixed(4)).press("enter");
-  d = d.press("2nd quit").press("stat").press("right").repeat("down", 8).press("enter");
+  d = d.press("2nd quit").press("stat").press("right").choose("SinReg");
   ok("SinReg reports too", (d.get().statReport?.title ?? "").startsWith("SinReg"));
   // The amplitude comes back as 1.99999… from four-decimal data, so match the
   // shape and the value rather than the exact digits.

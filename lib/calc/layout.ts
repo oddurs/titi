@@ -44,7 +44,7 @@ export interface ModeOption {
   hint: string;
 }
 
-export const MODE_ROWS: ModeOption[] = [
+export const ALL_MODE_ROWS: ModeOption[] = [
   {
     key: "graphMode",
     hint: "what the Y= slots mean",
@@ -154,3 +154,22 @@ export function solverRows(s: SolverState): SolverRow[] {
   rows.push({ kind: "upper", label: "bound}", value: formatNumber(s.bound[1], plain) });
   return rows;
 }
+
+/**
+ * The device splits these across two screens: MODE is what the numbers and
+ * the slots mean, FORMAT is what the graph looks like. They share one row
+ * description because they are edited identically.
+ */
+const FORMAT_KEYS = ["grid", "labelAxes", "coordsOn", "connected"] as const;
+
+export const MODE_ROWS = ALL_MODE_ROWS.filter(
+  (r) => !FORMAT_KEYS.includes(r.key as (typeof FORMAT_KEYS)[number]),
+);
+
+export const FORMAT_ROWS = ALL_MODE_ROWS.filter((r) =>
+  FORMAT_KEYS.includes(r.key as (typeof FORMAT_KEYS)[number]),
+);
+
+/** The rows a given screen edits. */
+export const modeRowsFor = (screen: "mode" | "format") =>
+  screen === "format" ? FORMAT_ROWS : MODE_ROWS;

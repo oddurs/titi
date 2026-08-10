@@ -131,7 +131,7 @@ export interface CalcMark {
  * would put it somewhere it was never placed.
  */
 export interface Drawing {
-  kind: "line" | "hline" | "vline" | "circle" | "point" | "text";
+  kind: "line" | "hline" | "vline" | "circle" | "point" | "text" | "curve" | "shade";
   x: number;
   y: number;
   /** the far end of a line, or a point on a circle's rim */
@@ -139,6 +139,14 @@ export interface Drawing {
   y2?: number;
   /** for text */
   label?: string;
+  /**
+   * For a curve or a shaded region: the expression in X, and for a shade the
+   * second one bounding it. DrawInv reflects in y = x, which is the same curve
+   * sampled the other way round.
+   */
+  expr?: string;
+  expr2?: string;
+  inverse?: boolean;
   /** Pt-Off knocks a hole rather than adding ink */
   erase?: boolean;
 }

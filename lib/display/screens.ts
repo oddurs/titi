@@ -2,7 +2,7 @@ import { formatNumber } from "../math/format";
 import { evaluate } from "../math/eval";
 import { slotLabels } from "../calc/curves";
 import { PLOT_COLORS } from "../calc/colors";
-import { MODE_ROWS, solverRows, visibleWindowFields, windowLabel } from "../calc/layout";
+import { modeRowsFor, MODE_ROWS, solverRows, visibleWindowFields, windowLabel } from "../calc/layout";
 import type { CalcState } from "../calc/store";
 import { CHAR_H, CHAR_W, INK, Pen } from "./pen";
 import { graphReadout, renderGraph } from "./graph";
@@ -383,7 +383,7 @@ function renderTable(pen: Pen, s: CalcState, top: number) {
 
 function renderMode(pen: Pen, s: CalcState, top: number, hits: HitRegion[]) {
   const first = Math.ceil(top / CHAR_H);
-  MODE_ROWS.forEach((m, i) => {
+  modeRowsFor(s.screen === "format" ? "format" : "mode").forEach((m, i) => {
     const row = first + i;
     if (row >= pen.textRows) return;
     let col = 0;

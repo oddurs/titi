@@ -70,6 +70,22 @@ export const FIXTURES: Record<string, () => Device> = {
 
   mode: () => device().press("mode"),
 
+  format: () => device().press("2nd format"),
+
+  "graph-drawn-curve": () =>
+    device().press("graph").press("2nd draw").choose("DrawF")
+      .press("X,T,θ,n").press("x²").press("sub").type("4").press("enter"),
+
+  "graph-shaded": () =>
+    device().press("graph").press("2nd draw").choose("Shade(")
+      .press("X,T,θ,n").press("enter").type("4").press("enter"),
+
+  "graph-polar-value": () =>
+    device()
+      .press("mode").repeat("right", 2).press("2nd quit")
+      .press("y=").type("4").press("sin").type("3").press("X,T,θ,n").press("rparen").press("enter")
+      .press("graph").press("2nd calc").choose("value").type("1").press("enter"),
+
   "graph-func": () =>
     device()
       .press("y=").press("X,T,θ,n").press("x²").press("sub").type("4").press("enter")

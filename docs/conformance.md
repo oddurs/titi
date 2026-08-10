@@ -98,11 +98,11 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | `WINDOW` | Bounds per mode, including `Tmin`/`Tmax`/`Tstep` and `nMin`/`nMax` | done | `lib/calc/layout.ts` |
 | `ZOOM` | ZBox, In, Out, ZDecimal, ZSquare, ZStandard, ZTrig, ZInteger, ZoomFit | done | `lib/calc/graphing.ts` |
 | `TRACE` | Walks a curve, reports the coordinate, switches between curves | done | `lib/calc/graphing.ts` |
-| `CALC` | value, zero, minimum, maximum, intersect, `dy/dx`, `∫f(x)dx` | partial | function mode only, and it says so |
-| `FORMAT` | Grid, axes, labels, coordinates | done | `lib/calc/layout.ts` |
+| `CALC` | value and `dy/dx` in every mode; zero, minimum, maximum, intersect and `∫f(x)dx` need a function of x, as they do on the device | done | `lib/calc/graphing.ts` |
+| `FORMAT` | Its own screen: grid, axes, labels, coordinates, connected or dot | done | `lib/calc/layout.ts` |
 | Plot styles | Line, thick, dot | done | `lib/calc/types.ts` |
-| Shading between curves | — | todo | the area shader exists for `∫f(x)dx` |
-| `ZOOM ▸ ZoomRcl` / `ZoomSto` | — | todo | — |
+| Shading between curves | `Shade(` hatches the region between two typed expressions | done | `lib/display/graph.ts` |
+| `ZoomSto` / `ZoomRcl` | One window put aside and brought back, saved with the rest | done | `lib/calc/graphing.ts` |
 
 ## DRAW
 
@@ -116,7 +116,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | `Pt-On(` `Pt-Off(` | One dot, added or erased | done | `lib/display/graph.ts` |
 | Placing points | Arrows drive a free cursor, ENTER sets one | done | `scripts/display.test.ts` |
 | Tangent | Draws the tangent at the cursor | done | `lib/calc/graphing.ts` |
-| `DrawInv` `DrawF` | — | todo | — |
+| `DrawInv` `DrawF` | A curve drawn without a Y slot, or reflected in y = x | done | `lib/display/graph.ts` |
 | `Pxl-On(` and the pixel commands | The panel is addressed in graph units, not pixels | out-of-scope | — |
 | `StorePic` / `RecallPic` | Nothing to store a picture into | out-of-scope | — |
 
@@ -220,7 +220,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | Func / Par / Pol / Seq | — | done | `lib/calc/curves.ts` |
 | Connected / Dot | — | done | `lib/display/graph.ts` |
 | Real / `a+bi` | — | done | `lib/calc/layout.ts` |
-| Grid, axes, labels, coordinates | Ours live in MODE rather than a separate FORMAT screen | partial | `lib/calc/layout.ts` |
+| Grid, axes, labels, coordinates | On their own `2ND FORMAT` screen, as on the device | done | `lib/calc/layout.ts` |
 | Sequential / Simul | Curves are drawn in one pass; there is nothing to interleave | out-of-scope | — |
 | `Full` / `Horiz` / `G-T` split screens | One panel, one screen | out-of-scope | — |
 

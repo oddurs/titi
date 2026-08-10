@@ -132,6 +132,8 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
           act("ZTrig", "zoom:trig", "π-scaled axes"),
           act("ZInteger", "zoom:integer", "Δx = 1"),
           act("ZoomFit", "zoom:fit", "fit y to the window"),
+          act("ZoomSto", "zoom:sto", "put this window aside"),
+          act("ZoomRcl", "zoom:rcl", "bring it back"),
         ],
       },
     ],
@@ -320,6 +322,9 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
           act("Text(", "draw:text", "a label where you put it"),
           act("Pt‑On(", "draw:pton", "one dot"),
           act("Pt‑Off(", "draw:ptoff", "take one dot away"),
+          act("DrawF", "draw:func", "a curve without a Y slot"),
+          act("DrawInv", "draw:inv", "the same curve reflected in y = x"),
+          act("Shade(", "draw:shade", "hatch between two expressions"),
         ],
       },
       {

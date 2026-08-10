@@ -2,7 +2,7 @@ import { sampler, type Env } from "../math/eval";
 import { buildCurves, paramRange } from "./curves";
 import { clamp, STANDARD_WINDOW } from "./defaults";
 import { findExtremum, findIntersection, findZeroNear } from "./analysis";
-import type { CalcMark, Drawing, YFunction } from "./types";
+import type { CalcMark, Drawing, Modes, YFunction } from "./types";
 import type { CalcState } from "./store";
 
 /**
@@ -145,6 +145,20 @@ function applyZoom(kind: string) {
       set({ screen: "graph", menu: null });
       zoomBy(4);
       break;
+    case "sto":
+      set({ savedWin: { ...get().win }, screen: "graph", menu: null });
+      note("Window stored");
+      persist();
+      return;
+    case "rcl": {
+      const saved = get().savedWin;
+      set({ screen: "graph", menu: null });
+      if (!saved) return note("No window stored");
+      set({ win: { ...saved }, revision: get().revision + 1, trace: null, marks: [] });
+      note("Window recalled");
+      persist();
+      return;
+    }
     case "box":
       set({ screen: "graph", menu: null, graphPrompt: { op: "box", stage: 0 } });
       note("Drag a box on the graph");
@@ -159,6 +173,13 @@ function applyZoom(kind: string) {
 /** How many points each command needs before it can be drawn. */
 const DRAW_POINTS: Record<string, number> = {
   line: 2, circle: 2, horizontal: 1, vertical: 1, pton: 1, ptoff: 1, text: 1,
+};
+
+/** These want typing, not pointing: an expression, and Shade( wants two. */
+const DRAW_TYPED: Record<string, string> = {
+  func: "Type an expression in X, then press enter",
+  inv: "Type an expression in X, then press enter",
+  shade: "Type the lower expression, then press enter",
 };
 
 const DRAW_PROMPT: Record<string, [string, string]> = {
@@ -181,6 +202,19 @@ function startDraw(op: string) {
   if (op === "clear") {
     set({ drawings: [], marks: [], menu: null, screen: "graph", graphPrompt: null, revision: get().revision + 1 });
     note("Drawings cleared");
+    return;
+  }
+  if (DRAW_TYPED[op]) {
+    set({
+      screen: "graph",
+      menu: null,
+      trace: null,
+      cursor: null,
+      entry: { text: "", caret: 0 },
+      entryFresh: false,
+      graphPrompt: { op: `draw:${op}`, stage: 0 },
+    });
+    note(DRAW_TYPED[op]);
     return;
   }
   if (!DRAW_POINTS[op]) return;
@@ -232,6 +266,41 @@ function resolveDraw(op: string, stage: number): boolean {
     });
   };
 
+  if (DRAW_TYPED[op]) {
+    const text = st.entry.text.trim();
+    if (!text) {
+      set({ graphPrompt: null, entry: { text: "", caret: 0 } });
+      note(null);
+      return true;
+    }
+    if (op === "shade" && stage === 0) {
+      set({
+        graphPrompt: { op: "draw:shade", stage: 1 },
+        // The first expression is kept on the prompt so it is not lost.
+        drawings: [...st.drawings, { kind: "shade", x: 0, y: 0, expr: text }],
+        entry: { text: "", caret: 0 },
+      });
+      note("Type the upper expression, then press enter");
+      return true;
+    }
+    if (op === "shade") {
+      // Finish the region opened a moment ago.
+      const drawings = st.drawings.slice();
+      const last = drawings[drawings.length - 1];
+      if (last && last.kind === "shade") drawings[drawings.length - 1] = { ...last, expr2: text };
+      set({
+        drawings,
+        graphPrompt: null,
+        entry: { text: "", caret: 0 },
+        message: null,
+        revision: st.revision + 1,
+      });
+      return true;
+    }
+    add({ kind: "curve", x: 0, y: 0, expr: text, inverse: op === "inv" });
+    return true;
+  }
+
   if (op === "text" && stage === 1) {
     const label = st.entry.text.trim();
     const at = st.graphPrompt?.point ?? c;
@@ -277,9 +346,63 @@ function currentTraceFn(): number {
   return first ? first.index : -1;
 }
 
+/**
+ * The operations that need a function of x.
+ *
+ * The device is the same: in Par, Pol and Seq mode its CALC menu offers the
+ * value and the derivatives and nothing else, because "the zero" of a curve
+ * that doubles back has no single meaning. So this refuses the rest by name
+ * rather than refusing the whole menu.
+ */
+const FUNC_ONLY = new Set(["zero", "min", "max", "intersect", "integral"]);
+
+/**
+ * value and dy/dx along a parameterised curve.
+ *
+ * In Par and Pol mode the parameter is not x, so the slope has to come from
+ * the curve: (dy/dt)/(dx/dt), by central difference. In Seq mode the terms are
+ * whole numbers apart and there is no slope to speak of, so only value runs.
+ */
+function runCurveCalc(op: string, mode: Modes["graphMode"]) {
+  const st = get();
+  set({ menu: null, screen: "graph" });
+
+  const curves = buildCurves(st.ys, st.modes, env);
+  const active = st.trace ? curves.find((c) => c.index === st.trace!.fn) : curves[0];
+  if (!active) return note("ERR: NO FUNCTIONS");
+
+  if (op === "value") {
+    set({ graphPrompt: { op: "curveValue", stage: 0 }, entry: { text: "", caret: 0 } });
+    return note(`${paramName(mode)} =`);
+  }
+  if (op !== "deriv") return note("CALC needs Func mode");
+  if (mode === "seq") return note("No slope in Seq mode");
+
+  const { min, max } = paramRange(mode, st.win);
+  const t = st.trace?.x ?? (min + max) / 2;
+  const h = Math.max(1e-6, (max - min) * 1e-5);
+  const a = active.at(t - h);
+  const b = active.at(t + h);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if (!Number.isFinite(dx) || !Number.isFinite(dy) || dx === 0) {
+    return note("ERR: DOMAIN");
+  }
+  const here = active.at(t);
+  set({
+    marks: [{ kind: "tangent", label: "dy/dx", x: here.x, y: here.y, slope: dy / dx, fn: active.index }],
+    trace: { fn: active.index, x: t },
+    revision: get().revision + 1,
+    message: null,
+  });
+}
+
+const paramName = (mode: Modes["graphMode"]) => (mode === "par" ? "T" : mode === "pol" ? "θ" : "n");
+
 function runCalc(op: string) {
   const st = get();
   if (st.modes.graphMode !== "func") {
+    if (!FUNC_ONLY.has(op)) return runCurveCalc(op, st.modes.graphMode);
     set({ menu: null, screen: "graph" });
     return note("CALC needs Func mode");
   }
@@ -353,6 +476,26 @@ function resolveGraphPrompt() {
   const p = st.graphPrompt;
   if (!p) return false;
   if (p.op.startsWith("draw:")) return resolveDraw(p.op.slice(5), p.stage);
+  if (p.op === "curveValue") {
+    // The parameter was typed; put the trace and a mark on that point.
+    const t = numberFromEntry();
+    const curves = buildCurves(st.ys, st.modes, env);
+    const active = st.trace ? curves.find((c) => c.index === st.trace!.fn) : curves[0];
+    if (t === null || t === undefined || !active) {
+      note("ERR: INVALID");
+      return true;
+    }
+    const at = active.at(t);
+    set({
+      graphPrompt: null,
+      entry: { text: "", caret: 0 },
+      trace: { fn: active.index, x: t },
+      marks: [{ kind: "point", label: "value", x: at.x, y: at.y, fn: active.index }],
+      message: null,
+      revision: st.revision + 1,
+    });
+    return true;
+  }
   if (p.op === "prgm:point") {
     const c = st.cursor ?? centreCursor();
     provideProgramPoint(c.x, c.y);

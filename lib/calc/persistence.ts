@@ -32,6 +32,8 @@ export const STORAGE_KEY = "titi.state.v1";
 export interface SavedState {
   ys: YFunction[];
   win: GraphWindow;
+  /** what ZoomSto put aside; null until it is used */
+  savedWin: GraphWindow | null;
   modes: Modes;
   tbl: TableSetup;
   lists: number[][];
@@ -48,6 +50,7 @@ export function defaultSave(): SavedState {
   return {
     ys: freshYs(),
     win: { ...STANDARD_WINDOW },
+    savedWin: null,
     modes: { ...DEFAULT_MODES },
     tbl: { start: 0, step: 1, auto: true, ask: [] },
     lists: Array.from({ length: 6 }, () => [] as number[]),
@@ -71,6 +74,7 @@ export function serialize(state: SavedState): string {
     v: SCHEMA_VERSION,
     ys: state.ys,
     win: state.win,
+    savedWin: state.savedWin,
     modes: state.modes,
     tbl: state.tbl,
     lists: state.lists,
@@ -203,6 +207,7 @@ export function deserialize(raw: string | null): LoadResult {
   const state: SavedState = {
     ys: take("ys", validYs),
     win: { ...base.win, ...take("win", validWin) },
+    savedWin: take("savedWin", (v) => v === null || validWin(v)),
     modes: { ...base.modes, ...take("modes", validModes) },
     tbl: take("tbl", validTbl),
     lists: take("lists", validLists),

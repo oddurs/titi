@@ -5,7 +5,7 @@ import { PLOT_COLORS } from "../calc/colors";
 import type {
   CalcMark, Drawing, GraphWindow, Modes, StatPlot, TraceState, YFunction,
 } from "../calc/types";
-import type { Env } from "../math/eval";
+import { sampler, type Env } from "../math/eval";
 import { CHAR_H, CHAR_W, INK, Pen } from "./pen";
 
 /** Everything the graph needs, passed in so this stays testable. */
@@ -61,6 +61,15 @@ function drawMark(
   }
   pen.hline(x - 1, x + 1, y, ink);
   pen.vline(x, y - 1, y + 1, ink);
+}
+
+/** Compile an expression a drawing carries, lenient so gaps become gaps. */
+function drawnSampler(env: Env, expr: string): ((x: number) => number) | null {
+  try {
+    return sampler(expr, { ...env, lenient: true, vars: { ...env.vars } });
+  } catch {
+    return null;
+  }
 }
 
 function niceStep(range: number, targetCount: number): number {
@@ -353,6 +362,52 @@ export function renderGraph(pen: Pen, g: GraphInput) {
       case "text":
         if (d.label) pen.text(Math.round(x / CHAR_W), Math.round(y / CHAR_H), d.label, INK.on);
         break;
+
+      case "curve": {
+        // Drawn, not slotted: sampled here rather than by the plotter, since
+        // it has no Y slot and no style to inherit.
+        if (!d.expr) break;
+        const f = drawnSampler(g.env, d.expr);
+        if (!f) break;
+        let prev: [number, number] | null = null;
+        const steps = d.inverse ? h : w;
+        for (let i = 0; i <= steps; i++) {
+          // DrawInv reflects in y = x, so the roles of the axes swap: the
+          // parameter runs down the y range and the value lands on x.
+          const t = d.inverse
+            ? win.ymin + (i / steps) * spanY
+            : win.xmin + (i / steps) * spanX;
+          const v = f(t);
+          if (!Number.isFinite(v)) { prev = null; continue; }
+          const at: [number, number] = d.inverse
+            ? [Math.round(px(v)), Math.round(py(t))]
+            : [Math.round(px(t)), Math.round(py(v))];
+          if (prev) pen.line(prev[0], prev[1], at[0], at[1], INK.on);
+          prev = at;
+        }
+        break;
+      }
+
+      case "shade": {
+        // The region between two curves, hatched rather than flooded — a
+        // flat fill would swallow both of them on a one-bit panel.
+        if (!d.expr) break;
+        const lower = drawnSampler(g.env, d.expr);
+        const upper = d.expr2 ? drawnSampler(g.env, d.expr2) : null;
+        if (!lower) break;
+        for (let i = 0; i <= w; i++) {
+          const t = win.xmin + (i / (w - 1)) * spanX;
+          const a = lower(t);
+          const b = upper ? upper(t) : win.ymax;
+          if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+          const lo = Math.round(py(Math.max(a, b)));
+          const hi = Math.round(py(Math.min(a, b)));
+          for (let k = Math.min(lo, hi); k <= Math.max(lo, hi); k += 3) {
+            if ((i + k) % 2 === 0) pen.dot(i, k, INK.on);
+          }
+        }
+        break;
+      }
     }
   }
 

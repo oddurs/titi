@@ -25,25 +25,10 @@ day with tests, `L` needs a design decision first.
 | — | The spec itself, and a test that keeps it honest | `bc417cb` |
 | 6 | The rest of the statistics — frequency lists, Med-Med, CubicReg and QuartReg, modified box plots | `6d5ad82` |
 | 7 | Distributions and probability — Poisson, geometric, t, χ², F, invT, and the counting functions | `88639e0` |
-| 8 | Programs that react — getKey, a placed Output(, IS>( and DS<(, and Input on the graph | pending |
+| 8 | Programs that react — getKey, a placed Output(, IS>( and DS<(, and Input on the graph | `2516be5` |
+| 9 | The graph's last controls — a FORMAT screen, ZoomSto and ZoomRcl, DrawF, DrawInv, Shade(, and CALC in every mode | pending |
 
 ---
-
-## Sprint 9 — The graph's last controls
-
-**Why now.** The graph is the most finished part of the app and these are the
-gaps you notice only once you are using it seriously — recalling a window you
-liked, shading a region, tracing a parametric curve. `CALC` refusing anything
-but function mode is the one that most looks like a missing feature rather than
-a choice.
-
-| Spec row | What it takes | Size |
-| --- | --- | --- |
-| `CALC` | zero, minimum, maximum and intersect in parametric, polar and sequence mode. `curves.ts` already parameterises all four, so the analysis has to move from sampling `f(x)` to sampling the curve. | L |
-| Shading between curves | `Shade(` and the region between two functions. The hatching from `∫f(x)dx` is the drawing half; picking and clipping the region is the rest. | M |
-| `ZOOM ▸ ZoomRcl` / `ZoomSto` | Store one window and get it back. Trivial state, except it should survive a reload, which means a line in the schema and a migration. | S |
-| `DrawInv` `DrawF` | Draw a function, or its reflection in `y=x`, without giving it a `Y` slot. Both are curves the plotter can already draw; they need somewhere to live that is not a slot. | M |
-| Grid, axes, labels, coordinates | These live in `MODE` here and on a separate `FORMAT` screen there. Moving them is a screen, not a behaviour — worth doing when `2ND FORMAT` has somewhere to go. | S |
 
 ## Sprint 10 — Editing, memory and the engine's leftovers
 

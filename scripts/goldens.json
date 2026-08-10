@@ -155,18 +155,70 @@
     ]
   },
   "mode": {
-    "digest": "6afdae11",
+    "digest": "b95d9e1b",
     "transcript": [
       "MODE RAD",
       "Func Param Polar Seq <",
       "Normal Sci Eng",
       "Float 0 1 2 3 4 5 6 7 8 9",
       "Radian Degree",
-      "Real a+bi",
-      "Connected Dot",
+      "Real a+bi"
+    ]
+  },
+  "format": {
+    "digest": "bba51844",
+    "transcript": [
+      "FORMAT RAD",
+      "Connected Dot <",
       "Grid on Grid off",
       "Labels on Labels off",
       "Coords on Coords off"
+    ]
+  },
+  "graph-drawn-curve": {
+    "digest": "4ba78c39",
+    "transcript": [
+      "GRAPH RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8"
+    ]
+  },
+  "graph-shaded": {
+    "digest": "0169ddba",
+    "transcript": [
+      "GRAPH RAD",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8"
+    ]
+  },
+  "graph-polar-value": {
+    "digest": "7abaf80c",
+    "transcript": [
+      "GRAPH TRACE RAD POL",
+      "8",
+      "6",
+      "4",
+      "2",
+      "-8 -4 4 8",
+      "-2",
+      "-4",
+      "-6",
+      "-8",
+      "r₁ θ=1 X=.30499 Y=.47499"
     ]
   },
   "graph-func": {
@@ -545,7 +597,7 @@
     ]
   },
   "menu-zoom": {
-    "digest": "ca3ed034",
+    "digest": "dbca2f4c",
     "transcript": [
       "HOME ZOOM RAD",
       "1:ZBox",
@@ -557,6 +609,8 @@
       "7:ZTrig",
       "8:ZInteger",
       "9:ZoomFit",
+      "10:ZoomSto",
+      "11:ZoomRcl",
       "READY",
       "> drag a box on the graph"
     ]

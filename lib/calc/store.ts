@@ -23,6 +23,7 @@ import {
   STANDARD_WINDOW,
 } from "./defaults";
 import {
+  modeRowsFor,
   MODE_ROWS,
   WINDOW_FIELDS,
   WINDOW_LABELS,
@@ -123,6 +124,8 @@ export interface CalcState {
    * device.
    */
   onEquals: boolean;
+  /** a window put aside by ZoomSto, for ZoomRcl to bring back */
+  savedWin: GraphWindow | null;
   /** free-moving cursor on the graph when not tracing */
   cursor: { x: number; y: number } | null;
   graphPrompt: {
@@ -1125,8 +1128,9 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
             menu: { ...st.menu, index: (st.menu.index + dir + items.length) % items.length },
           });
         }
-        if (st.screen === "mode") {
-          return set({ row: clamp(st.row + dir, 0, MODE_ROWS.length - 1) });
+        if (st.screen === "mode" || st.screen === "format") {
+          const rows = modeRowsFor(st.screen);
+          return set({ row: clamp(st.row + dir, 0, rows.length - 1) });
         }
         if (st.screen === "graph") {
           if (nudgeCursor(0, -dir)) return;
@@ -1159,8 +1163,9 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
           }
           return;
         }
-        if (st.screen === "mode") {
-          const row = MODE_ROWS[st.row];
+        if (st.screen === "mode" || st.screen === "format") {
+          const row = modeRowsFor(st.screen)[st.row];
+          if (!row) return;
           const cur = row.choices.findIndex((c) => c.value === st.modes[row.key]);
           const next = clamp(cur + dir, 0, row.choices.length - 1);
           const modes = { ...st.modes, [row.key]: row.choices[next].value } as Modes;
@@ -1210,6 +1215,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
           prgmLines: [],
           prgmName: "",
           plots: freshPlots(),
+          savedWin: null,
           statFreq: null,
           marks: [],
           trace: null,
@@ -1247,6 +1253,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     modes: { ...DEFAULT_MODES },
     menu: null,
     trace: null,
+    savedWin: null,
     marks: [],
     drawings: [],
     plots: freshPlots(),

@@ -41,7 +41,9 @@ const sprints = rows(ROADMAP, 3)
   .map((r) => ({ sprint: r.section, item: r.cells[0], takes: r.cells[1], size: r.cells[2] }));
 
 describe("the roadmap is well formed");
-ok("it schedules something", sprints.length > 10, `${sprints.length}`);
+// The plan empties as it is worked through; what matters is that it covers
+// what the spec still admits is missing, which the section below checks.
+ok("it schedules whatever is left", sprints.length > 0, `${sprints.length}`);
 for (const size of new Set(sprints.map((s) => s.size))) {
   ok(`"${size}" is a size we use`, ["S", "M", "L"].includes(size));
 }

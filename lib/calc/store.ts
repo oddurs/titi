@@ -1010,16 +1010,16 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         set({ history: [], statReport: null });
         persist();
         return;
-    }
 
-    switch (action) {
-      case "mod:2nd":
-        set({ mod: st.mod === "2nd" ? "none" : "2nd" });
-        return;
-      case "mod:alpha":
-        set({ mod: st.mod === "alpha" ? "none" : "alpha" });
-        return;
-      case "mod:alphalock":
+      case "mod":
+        if (arg === "2nd") {
+          set({ mod: st.mod === "2nd" ? "none" : "2nd" });
+          return;
+        }
+        if (arg === "alpha") {
+          set({ mod: st.mod === "alpha" ? "none" : "alpha" });
+          return;
+        }
         set({ mod: st.mod === "alpha-lock" ? "none" : "alpha-lock" });
         return;
 

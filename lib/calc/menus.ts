@@ -378,8 +378,17 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
   },
 
   prgm: {
+    // Only reached when there are none; the real tabs are built from state.
     title: "prgm",
-    tabs: [{ name: "exec", items: [act("No programs", "app:none", "")] }],
+    tabs: [{
+      name: "exec",
+      items: [{
+        label: "No programs",
+        action: "noop",
+        hint: "create one under NEW",
+        disabled: true,
+      }],
+    }],
   },
 
   /** The MATH tab of the MATRIX menu; NAMES and EDIT are built from state. */

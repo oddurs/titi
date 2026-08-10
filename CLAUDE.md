@@ -11,7 +11,13 @@ npm run check      # typecheck + lint + tests; run before declaring done
 npm test           # every suite in one process, one total
 npm run build      # static export to ./out
 npm run icons      # redraw public/*.png from the glyph ROM
+npm run verify     # build, then check it in a real browser
 ```
+
+`npm run verify` is the half `npm test` cannot reach: both viewports, hydration,
+overflow, the keypad's single tab stop, an offline load with the network cut,
+and the numbers — page weight, first paint, keystroke to paint. It needs Chrome
+on the machine and leaves screenshots in `.verify/`.
 
 Suites live in `scripts/` and share `harness.ts`. Each ends with
 `reportIfMain(import.meta.url)` so it reports when run alone and stays quiet
@@ -170,6 +176,14 @@ the two fight over the same keys and neither wins.
 it from the lexer's `FUNCTIONS`, so adding a function to the engine puts it in
 the catalog. A letter key in any open menu jumps the selection rather than
 typing; the catalog just happens to be the menu that needs it.
+
+**Actions are one namespace, dispatched on the verb.** `runAction` splits on
+`:` and switches on the first part, so `rcl:A` is the `rcl` case with an
+argument. There used to be a second switch on the whole string; between them a
+case could land in the wrong one and never run, and a new case could shadow a
+key's own — both happened. `scripts/actions.test.ts` now reads the case labels
+out of the source and fails on a duplicate verb, on a label containing a colon,
+and on any action in `keys.ts` or `menus.ts` that no case answers to.
 
 **A menu closes before its action runs.** `chooseMenuItem` clears `menu` and
 then dispatches, so an action that means to stay open (stepping a stat plot's

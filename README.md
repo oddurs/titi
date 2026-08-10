@@ -129,6 +129,15 @@ spec the same way: every missing feature had to be scheduled exactly once. It
 is empty now — the spec has no `todo` rows left. What remains is the
 `out-of-scope` list, which stays out on purpose and says why.
 
+### Checking it
+
+`npm test` runs everything that does not need a browser — the engine, the
+device, the panel — in about half a second. `npm run verify` covers the rest:
+it builds, serves the export, and checks in Chrome that both viewports render
+and hydrate, that nothing spills off the edges, that the keypad is one tab
+stop, that it still opens with the network cut, and how long a keystroke takes
+to appear.
+
 ### Offline
 
 There is no server behind this, so there is no reason for it to need the

@@ -4,6 +4,7 @@ import { renderPanel, shows } from "./panel";
 import { CHAR_H, Pen } from "../lib/display/pen";
 import { inkGain } from "../lib/display/panel";
 import { renderFailure } from "../lib/display/screens";
+import { MENUS } from "../lib/calc/menus";
 
 /**
  * What the panel actually draws.
@@ -105,7 +106,9 @@ describe("menus");
   ok("items are numbered", shows(p, "1:"));
   ok("the selected item's hint is explained", shows(p, "decimal to fraction"));
   ok("every item is tappable", p.hits.filter((h) => h.kind === "menuItem").length > 3);
-  ok("and so is every tab", p.hits.filter((h) => h.kind === "menuTab").length === 3);
+  // MATH has four tabs on the device — MATH, NUM, CPX, PRB — and so does this.
+  eq("and so is every tab", p.hits.filter((h) => h.kind === "menuTab").length,
+    MENUS.math.tabs.length);
 }
 {
   const d = device().press("math").press("down");

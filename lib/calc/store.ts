@@ -6,6 +6,7 @@ import { formatMatrixRows, formatNumber, formatValue, toDMS, toFraction } from "
 import { isMatrix } from "../math/matrix";
 import { nextBoundary, prevBoundary } from "../math/lexer";
 import { keyById, keyCode } from "./keys";
+import { ParseError } from "../math/ast";
 import { MENUS } from "./menus";
 import type { StatReport } from "../math/stats";
 import { createReports } from "./reports";
@@ -124,6 +125,8 @@ export interface CalcState {
    * device.
    */
   onEquals: boolean;
+  /** the line that failed, so Goto can bring it back */
+  errorSrc: string;
   /** a window put aside by ZoomSto, for ZoomRcl to bring back */
   savedWin: GraphWindow | null;
   /** free-moving cursor on the graph when not tracing */
@@ -234,7 +237,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
 
   // -- committing edits -----------------------------------------------------
 
-  function evalEntry(): { ok: boolean; text: string } {
+  function evalEntry(): { ok: boolean; text: string; at?: number } {
     const src = get().entry.text.trim();
     if (!src) return { ok: false, text: "" };
     try {
@@ -243,9 +246,13 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       env.vars.Ans = typeof v === "number" ? v : NaN;
       return { ok: true, text: formatValue(v, fmt()) };
     } catch (e) {
+      // The parser knows which character it choked on; carry it out so the
+      // caret can be put there rather than making someone hunt for it.
+      const at = e instanceof ParseError ? e.at : undefined;
       return {
         ok: false,
-        text: e instanceof CalcError ? e.message : "ERR: SYNTAX",
+        text: e instanceof CalcError || e instanceof ParseError ? e.message : "ERR: SYNTAX",
+        at,
       };
     }
   }
@@ -253,7 +260,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
   function commitHome() {
     const src = get().entry.text.trim();
     if (!src) return;
-    const { ok, text } = evalEntry();
+    const { ok, text, at } = evalEntry();
     const value = env.ans;
     const item: HistoryItem = {
       id: get().history.length + 1,
@@ -267,6 +274,26 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       entry: { text: "", caret: 0 },
       // The next ENTRY starts from the top again.
       entryIndex: -1,
+      // An error offers to put the caret back where it went wrong.
+      menu: ok
+        ? null
+        : {
+            title: text,
+            tabs: [{
+              name: "error",
+              items: [
+                { label: "Quit", action: "noop", hint: "back to the home screen" },
+                {
+                  label: "Goto",
+                  action: `goto:${at ?? 0}`,
+                  hint: "put the caret where it went wrong",
+                },
+              ],
+            }],
+            tab: 0,
+            index: 0,
+          },
+      errorSrc: ok ? "" : src,
     });
     // A store into a Y-variable should be reflected in the editor list.
     syncEnv();
@@ -758,6 +785,41 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     return false;
   }
 
+  /** Everything currently stored, for RCL and for Mem Mgmt. */
+  function storedThings(): { label: string; name: string; hint: string }[] {
+    const st = get();
+    const out: { label: string; name: string; hint: string }[] = [];
+    for (const v of "ABCDEFGHIJKLMNOPQRSTUVWXYZθ") {
+      if (env.vars[v]) {
+        out.push({ label: v, name: v, hint: formatNumber(env.vars[v], { notation: "normal", decimals: -1 }) });
+      }
+    }
+    st.lists.forEach((l, i) => {
+      if (l.length) out.push({ label: `L${"₁₂₃₄₅₆"[i]}`, name: `L${"₁₂₃₄₅₆"[i]}`, hint: `${l.length} values` });
+    });
+    for (const [name, m] of Object.entries(st.mats)) {
+      out.push({ label: name, name, hint: `${m.r}×${m.c}` });
+    }
+    return out;
+  }
+
+  function openRecall() {
+    const things = storedThings();
+    set({
+      menu: {
+        title: "rcl",
+        tabs: [{
+          name: "stored",
+          items: things.length
+            ? things.map((t) => ({ label: t.label, action: `rcl:${t.name}`, hint: t.hint }))
+            : [{ label: "Nothing stored", action: "noop", disabled: true, hint: "store something with sto▸" }],
+        }],
+        tab: 0,
+        index: 0,
+      },
+    });
+  }
+
   function chooseMenuItem() {
     const st = get();
     const m = st.menu;
@@ -871,6 +933,57 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         persist();
         return;
       }
+      case "memdel": {
+        const name = action.slice("memdel:".length);
+        if (name.startsWith("[")) {
+          const mats = { ...st.mats };
+          delete mats[name];
+          set({ mats, revision: st.revision + 1 });
+          delete env.mats[name];
+        } else if (name.startsWith("L")) {
+          const i = "₁₂₃₄₅₆".indexOf(name.slice(-1));
+          const lists = st.lists.map((l, k) => (k === i ? [] : l));
+          set({ lists, revision: st.revision + 1 });
+          syncEnv({ lists });
+        } else {
+          env.vars[name] = 0;
+          set({ revision: st.revision + 1 });
+        }
+        note(`${name} deleted`);
+        persist();
+        runAction("mem");
+        return;
+      }
+
+      case "goto": {
+        // Bring back the line that failed, caret on the offending character.
+        const at = Number(arg);
+        const src = st.errorSrc;
+        if (!src) return set({ menu: null });
+        set({
+          menu: null,
+          screen: "home",
+          target: { kind: "home" },
+          entry: { text: src, caret: clamp(at, 0, src.length) },
+          entryFresh: false,
+          message: null,
+        });
+        return;
+      }
+
+      case "rcl": {
+        // A scalar comes back as its value, which is the point of RCL — you
+        // get something you can edit. A list or a matrix comes back as its
+        // name, because forty numbers in the line helps nobody.
+        const name = action.slice("rcl:".length);
+        if (name in env.vars) {
+          insert(formatNumber(env.vars[name], { notation: "normal", decimals: -1 }));
+        } else {
+          insert(name);
+        }
+        return;
+      }
+
       case "var": {
         const v = st.win[arg as WindowField];
         insert(formatNumber(v, { notation: "normal", decimals: -1 }));
@@ -978,11 +1091,29 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         return;
       }
 
-      case "recall": {
-        const last = st.history[st.history.length - 1];
-        if (last) insert(last.output);
+      case "mem": {
+        // Everything stored, with what it is; choosing one deletes it and
+        // reopens the list, so clearing several is one keypress each.
+        const things = storedThings();
+        set({
+          menu: {
+            title: "delete what?",
+            tabs: [{
+              name: "memory",
+              items: things.length
+                ? things.map((t) => ({ label: t.label, action: `memdel:${t.name}`, hint: t.hint }))
+                : [{ label: "Nothing stored", action: "noop", disabled: true, hint: "" }],
+            }],
+            tab: 0,
+            index: 0,
+          },
+        });
         return;
       }
+
+      case "recall":
+        openRecall();
+        return;
 
       case "lastEntry": {
         // The stack is the inputs, most recent first, without the immediate
@@ -1253,6 +1384,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     modes: { ...DEFAULT_MODES },
     menu: null,
     trace: null,
+    errorSrc: "",
     savedWin: null,
     marks: [],
     drawings: [],

@@ -66,6 +66,18 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
           ins("max(", "max("),
           ins("lcm(", "lcm("),
           ins("gcd(", "gcd("),
+          ins("remainder(", "remainder(", "sign of the divisor"),
+        ],
+      },
+      {
+        name: "cpx",
+        items: [
+          ins("conj(", "conj(", "a-bi"),
+          ins("real(", "real(", "the real part"),
+          ins("imag(", "imag(", "the imaginary part"),
+          ins("angle(", "angle(", "the argument"),
+          ins("abs(", "abs(", "the modulus"),
+          ins("i", "i", "√(-1)"),
         ],
       },
       {
@@ -90,6 +102,15 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
         items: [
           ins("=", "="), ins("≠", "≠"), ins(">", ">"),
           ins("≥", "≥"), ins("<", "<"), ins("≤", "≤"),
+        ],
+      },
+      {
+        name: "logic",
+        items: [
+          ins("and", " and ", "both non-zero"),
+          ins("or", " or ", "either non-zero"),
+          ins("xor", " xor ", "one but not both"),
+          ins("not(", "not(", "zero becomes one"),
         ],
       },
     ],
@@ -390,6 +411,7 @@ export const MENUS: Record<string, { title: string; tabs: MenuTab[] }> = {
       {
         name: "mem",
         items: [
+          act("Mem Mgmt", "mem", "see what is stored, and delete it"),
           act("ClrAllLists", "stat:clear"),
           act("ClrHome", "home:clear"),
           act("Reset RAM", "reset"),

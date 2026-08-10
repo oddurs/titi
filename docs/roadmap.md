@@ -26,27 +26,17 @@ day with tests, `L` needs a design decision first.
 | 6 | The rest of the statistics — frequency lists, Med-Med, CubicReg and QuartReg, modified box plots | `6d5ad82` |
 | 7 | Distributions and probability — Poisson, geometric, t, χ², F, invT, and the counting functions | `88639e0` |
 | 8 | Programs that react — getKey, a placed Output(, IS>( and DS<(, and Input on the graph | `2516be5` |
-| 9 | The graph's last controls — a FORMAT screen, ZoomSto and ZoomRcl, DrawF, DrawInv, Shade(, and CALC in every mode | pending |
+| 9 | The graph's last controls — a FORMAT screen, ZoomSto and ZoomRcl, DrawF, DrawInv, Shade(, and CALC in every mode | `997cf6b` |
+| 10 | Editing, memory and the engine's leftovers — error Goto, a real RCL, Mem Mgmt, the logic connectives, remainder(, the CPX tab | pending |
 
 ---
 
-## Sprint 10 — Editing, memory and the engine's leftovers
+## Nothing scheduled
 
-**Why now.** What is left: the things that make a mistake cheap and a session
-recoverable. None of it is glamorous and all of it is felt. `Goto` after an
-error in particular is the difference between fixing a typo and retyping a
-line.
-
-| Spec row | What it takes | Size |
-| --- | --- | --- |
-| Error `Goto` | On an error, offer `Goto`, and put the caret on the offending character. `ParseError` already carries the position — nothing reads it yet. | M |
-| `2ND RCL` | Recall any variable, list or matrix into the line, not just the last answer. Needs a small picker, which the menu machinery gives for free. | S |
-| `Mem Mgmt` | Browse what is stored and delete individual variables. A screen over `env` plus the list, matrix and program tables. | M |
-| `LOGIC` | `and`, `or`, `xor`, `not(` — comparisons already return 1 and 0, so this is precedence and four operators. | S |
-| `MATH ▸ NUM ▸ remainder(` | Two arguments, sign of the divisor. Genuinely one line and a test. | S |
-| `MATH ▸ CPX` | The complex operations exist under their own names; this is the menu tab that gathers them where the device puts them. | S |
-
----
+The spec has no `todo` rows left: everything it admits is missing has been
+built, and what remains is the `out-of-scope` list, which stays out on purpose
+and gives its reasons there. If one of those should be built, change its status
+in the spec first — this file only schedules what the spec admits is missing.
 
 ## Not scheduled
 

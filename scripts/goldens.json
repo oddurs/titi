@@ -19,12 +19,73 @@
     ]
   },
   "home-error": {
-    "digest": "381e8e64",
+    "digest": "429ecef6",
     "transcript": [
-      "HOME RAD",
+      "HOME ERROR RAD",
+      "1:Quit",
+      "2:Goto",
       "1÷0",
       "ERR: DIVIDE BY 0",
-      ">"
+      "> back to the home screen"
+    ]
+  },
+  "home-error-goto": {
+    "digest": "429ecef6",
+    "transcript": [
+      "HOME ERROR RAD",
+      "1:Quit",
+      "2:Goto",
+      "2+×3",
+      "ERR: SYNTAX",
+      "> back to the home screen"
+    ]
+  },
+  "menu-rcl": {
+    "digest": "a3a53ae9",
+    "transcript": [
+      "HOME STORED RAD",
+      "1:A",
+      "2:[A]",
+      "7→A",
+      "7",
+      "> 7"
+    ]
+  },
+  "menu-memory": {
+    "digest": "c8af2640",
+    "transcript": [
+      "HOME MEMORY RAD",
+      "1:A",
+      "2:[A]",
+      "7→A",
+      "7",
+      "> 7"
+    ]
+  },
+  "menu-logic": {
+    "digest": "38a19dd7",
+    "transcript": [
+      "HOME TEST LOGIC RAD",
+      "1:and",
+      "2:or",
+      "3:xor",
+      "4:not(",
+      "READY",
+      "> both non-zero"
+    ]
+  },
+  "menu-cpx": {
+    "digest": "2239d0b4",
+    "transcript": [
+      "HOME MATH NUM CPX PRB RAD",
+      "1:conj(",
+      "2:real(",
+      "3:imag(",
+      "4:angle(",
+      "5:abs(",
+      "6:i",
+      "READY",
+      "> a-bi"
     ]
   },
   "home-complex": {
@@ -579,9 +640,9 @@
     ]
   },
   "menu-math": {
-    "digest": "55a76a2e",
+    "digest": "2bc75e16",
     "transcript": [
-      "HOME MATH NUM PRB RAD",
+      "HOME MATH NUM CPX PRB RAD",
       "1:▸Frac",
       "2:▸Dec",
       "3:x³",

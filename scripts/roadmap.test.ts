@@ -41,9 +41,15 @@ const sprints = rows(ROADMAP, 3)
   .map((r) => ({ sprint: r.section, item: r.cells[0], takes: r.cells[1], size: r.cells[2] }));
 
 describe("the roadmap is well formed");
-// The plan empties as it is worked through; what matters is that it covers
-// what the spec still admits is missing, which the section below checks.
-ok("it schedules whatever is left", sprints.length > 0, `${sprints.length}`);
+// The plan empties as it is worked through. An empty one is correct exactly
+// when the spec has nothing left to do — which the section below enforces from
+// the other side.
+const outstandingTodo = spec.filter((r) => r.status === "todo").length;
+ok(
+  "it schedules whatever is left",
+  outstandingTodo === 0 ? sprints.length === 0 : sprints.length > 0,
+  `${sprints.length} scheduled for ${outstandingTodo} missing`,
+);
 for (const size of new Set(sprints.map((s) => s.size))) {
   ok(`"${size}" is a size we use`, ["S", "M", "L"].includes(size));
 }
@@ -56,12 +62,15 @@ describe("the sprints run in order without gaps");
   const sorted = [...numbers].sort((a, b) => a - b);
   eq("they are written in order", numbers, sorted);
   eq("and nothing is skipped", sorted, sorted.map((_, i) => sorted[0] + i));
-  // The plan starts where the shipped list stops — otherwise a sprint can be
-  // finished and quietly left on the roadmap, or dropped without shipping.
   const shipped = rows(ROADMAP, 3)
     .filter((r) => r.section === "Shipped" && /^\d+$/.test(r.cells[0]))
     .map((r) => Number(r.cells[0]));
-  eq("the plan starts where the shipped list stops", sorted[0], Math.max(...shipped) + 1);
+  ok("every sprint that shipped says where", shipped.length > 0);
+  // The plan starts where the shipped list stops — otherwise a sprint can be
+  // finished and quietly left on the roadmap, or dropped without shipping.
+  if (sorted.length) {
+    eq("the plan starts where the shipped list stops", sorted[0], Math.max(...shipped) + 1);
+  }
 }
 
 describe("nothing is scheduled that the spec has not admitted to");

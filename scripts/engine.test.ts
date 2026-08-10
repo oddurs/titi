@@ -230,6 +230,27 @@ describe("the distributions, against what they must equal");
   near("I(x;1,1) is x", incompleteBeta(0.42, 1, 1), 0.42, 1e-12);
 }
 
+describe("remainder and the connectives");
+check("remainder(7,3)", "1", toRad);
+check("remainder(-7,3)", "2");
+check("remainder(7,-3)", "-2");
+check("remainder(6,3)", "0");
+check("remainder(1,0)", "ERR: DIVIDE BY 0");
+check("1 and 1", "1");
+check("1 and 0", "0");
+check("0 or 0", "0");
+check("3 or 0", "1");
+check("1 xor 1", "0");
+check("1 xor 0", "1");
+check("not(0)", "1");
+check("not(7)", "0");
+// The connectives bind looser than the comparisons they join, so this reads
+// the way it looks rather than as 2>(1 and 3)>2.
+check("2>1 and 3>2", "1");
+check("2>1 and 1>2", "0");
+check("1>2 or 2>1", "1");
+check("not(2>1)", "0");
+
 describe("counting");
 check("nPr(10,3)", "720", toRad);
 check("nCr(10,3)", "120");

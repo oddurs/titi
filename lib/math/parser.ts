@@ -25,6 +25,7 @@ const ARITY: Record<string, [number, number]> = {
   augment: [2, 2], dim: [1, 1], Fill: [2, 2], randM: [2, 2],
   matr2list: [2, 2], list2matr: [1, 9],
   real: [1, 1], imag: [1, 1], angle: [1, 1], "@seq": [2, 2],
+  remainder: [2, 2], not: [1, 1],
   rectToR: [2, 2], rectToTheta: [2, 2], polarToX: [2, 2], polarToY: [2, 2],
   sortA: [1, 1], sortD: [1, 1], cumSum: [1, 1], deltaList: [1, 1], prod: [1, 3],
   poissonpdf: [2, 2], poissoncdf: [2, 2], geometpdf: [2, 2], geometcdf: [2, 2],
@@ -36,6 +37,8 @@ const ARITY: Record<string, [number, number]> = {
 };
 
 const COMPARE = new Set(["=", "≠", "<", ">", "≤", "≥"]);
+/** Looser than any comparison, so A=1 and B=2 groups the way it reads. */
+const CONNECTIVES = new Set(["and", "or", "xor"]);
 
 class Parser {
   private i = 0;
@@ -75,7 +78,7 @@ class Parser {
   }
 
   private parseStore(): Node {
-    const e = this.parseCompare();
+    const e = this.parseLogic();
     if (this.at("store")) {
       this.next();
       const t = this.peek();
@@ -92,6 +95,16 @@ class Parser {
       return { t: "store", e, target: t.value };
     }
     return e;
+  }
+
+  /** and, or and xor bind looser than the comparisons they join. */
+  private parseLogic(): Node {
+    let l = this.parseCompare();
+    while (this.peek()?.kind === "op" && CONNECTIVES.has(this.peek()!.value)) {
+      const op = this.next().value;
+      l = { t: "bin", op, l, r: this.parseCompare() };
+    }
+    return l;
   }
 
   private parseCompare(): Node {
@@ -297,9 +310,12 @@ class Parser {
     if (t.kind === "fn") {
       this.next();
       const args: Node[] = [];
+      // Arguments parse at the logic level, not the sum level: not(A>B) and
+      // fnInt(X>1,…) are ordinary things to write, and a comparison below a
+      // comma has nowhere else to be parsed.
       if (!this.at("rparen") && this.i < this.toks.length) {
-        args.push(this.parseSum());
-        while (this.eat("comma")) args.push(this.parseSum());
+        args.push(this.parseLogic());
+        while (this.eat("comma")) args.push(this.parseLogic());
       }
       this.closeParen();
       const range = ARITY[t.value];

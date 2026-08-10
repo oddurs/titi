@@ -150,7 +150,10 @@ describe("coverage");
       `— ${Math.round((built / wanted) * 100)}% of what we mean to build`,
   );
   ok("most of the device is built", built / wanted > 0.75);
-  ok("and the spec is honest about the rest", todo > 0);
+  // Nothing left to do is a legitimate state, and the roadmap test is the one
+  // that checks the plan agrees. What must hold here is that every row still
+  // carries a status and out-of-scope still carries a reason, both above.
+  ok("and something is actually built", done > 50, `${done}`);
 }
 
 reportIfMain(import.meta.url);

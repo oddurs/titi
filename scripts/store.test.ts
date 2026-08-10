@@ -500,4 +500,54 @@ describe("the table can be asked");
   ok("the asked X appears with its answer", p.transcript.some((l) => l.includes("3") && l.includes("9")));
 }
 
+describe("an error offers to take you back to it");
+{
+  const d = device().type("2+*3").press("enter");
+  eq("the error names itself", d.get().menu?.title, "ERR: SYNTAX");
+  eq("and offers both ways out", d.get().menu?.tabs[0].items.map((i) => i.label), ["Quit", "Goto"]);
+  d.choose("Goto");
+  eq("Goto brings the line back", d.get().entry.text, "2+×3");
+  eq("with the caret on what went wrong", d.get().entry.caret, 2);
+  eq("and the menu gone", d.get().menu, null);
+}
+{
+  const d = device().type("2+*3").press("enter").choose("Quit");
+  eq("Quit leaves the line behind", d.get().entry.text, "");
+  eq("and the error is on the tape", d.get().history[0].output, "ERR: SYNTAX");
+}
+{
+  const d = device().type("7/8").press("enter");
+  eq("a line that works offers nothing", d.get().menu, null);
+}
+
+describe("rcl brings back what is stored");
+{
+  const d = device().type("7").press("sto▸").press("alpha A").press("enter").press("2nd rcl");
+  const labels = d.get().menu?.tabs[0].items.map((i) => i.label) ?? [];
+  ok("the variable is listed", labels.includes("A"));
+  ok("and so is the matrix", labels.includes("[A]"));
+  d.choose("A");
+  eq("a scalar comes back as its value", d.get().entry.text, "7");
+}
+{
+  const d = device().press("2nd rcl").choose("[A]");
+  eq("a matrix comes back as its name", d.get().entry.text, "[A]");
+}
+
+describe("memory management");
+{
+  const d = device().type("7").press("sto▸").press("alpha A").press("enter")
+    .press("2nd mem").choose("Mem Mgmt");
+  ok("it lists what is stored", (d.get().menu?.tabs[0].items.length ?? 0) >= 2);
+  d.choose("A");
+  eq("choosing one deletes it", d.get().env.vars.A, 0);
+  ok("and says so", (d.get().message ?? "").includes("deleted"));
+  ok("leaving the list open for the next", d.get().menu !== null);
+  eq("with that one gone", d.get().menu?.tabs[0].items.some((i) => i.label === "A"), false);
+}
+{
+  const d = device().press("2nd mem").choose("Mem Mgmt").choose("[A]");
+  eq("a matrix can go too", Object.keys(d.get().mats).length, 0);
+}
+
 reportIfMain(import.meta.url);

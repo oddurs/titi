@@ -800,6 +800,11 @@ export function compile(node: Node): Fn {
         case ">": return (env) => map2(l(env), r(env), (a, b) => (a > b ? 1 : 0));
         case "≤": return (env) => map2(l(env), r(env), (a, b) => (a <= b ? 1 : 0));
         case "≥": return (env) => map2(l(env), r(env), (a, b) => (a >= b ? 1 : 0));
+        // The connectives take anything non-zero as true and answer 1 or 0.
+        case "and": return (env) => map2(l(env), r(env), (a, b) => (a !== 0 && b !== 0 ? 1 : 0));
+        case "or": return (env) => map2(l(env), r(env), (a, b) => (a !== 0 || b !== 0 ? 1 : 0));
+        case "xor":
+          return (env) => map2(l(env), r(env), (a, b) => ((a !== 0) !== (b !== 0) ? 1 : 0));
         default: throw new CalcError("ERR: SYNTAX");
       }
     }
@@ -932,6 +937,16 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
 
     // R▸Pr( and friends: the angle argument and result follow the angle mode,
     // the lengths never do.
+    // remainder( keeps the sign of the divisor, as the device does — so
+    // remainder(-7,3) is 2 rather than -1.
+    case "remainder":
+      return (env) =>
+        map2(a[0](env), a[1](env), (x, y) =>
+          y === 0 ? fail(env, "ERR: DIVIDE BY 0") : x - y * Math.floor(x / y),
+        );
+    case "not":
+      return (env) => map1(a[0](env), (x) => (x === 0 ? 1 : 0));
+
     case "rectToR":
       return (env) => map2(a[0](env), a[1](env), (x, y) => Math.hypot(x, y));
     case "rectToTheta":

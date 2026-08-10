@@ -58,8 +58,8 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | Right-associative power | `2^3^2` is `512` | done | `scripts/engine.test.ts` |
 | Optional closing paren | `sin(X` parses | done | `lib/math/parser.ts` |
 | TI error strings | `ERR: SYNTAX`, `ERR: DOMAIN`, `ERR: NONREAL ANS` and friends | done | `lib/math/eval.ts` |
-| `2ND RCL` | Recalls the last answer into the line | partial | recalls the answer, not an arbitrary variable |
-| Error `Goto` | Jumping the cursor to the offending character | todo | `lib/math/ast.ts` carries the position already |
+| `2ND RCL` | A picker of everything stored: a scalar comes back as its value, a list or matrix as its name | done | `lib/calc/store.ts` |
+| Error `Goto` | An error offers Quit or Goto; Goto brings the line back with the caret on the offending character | done | `scripts/store.test.ts` |
 
 ## MATH
 
@@ -68,8 +68,8 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | `MATH ▸ MATH` | `▸Frac`, `▸Dec`, `x³`, `∛(`, `ˣ√(`, `fMin(`, `nDeriv(`, `fnInt(`, `solve(`, Solver | done | `lib/calc/menus.ts` |
 | `MATH ▸ NUM` | `abs(`, `round(`, `iPart(`, `fPart(`, `int(`, `min(`, `max(`, `lcm(`, `gcd(` | done | `lib/math/eval.ts` |
 | `MATH ▸ PRB` | `rand`, `nPr(`, `nCr(`, `!`, `randInt(`, `randNorm(` | done | `lib/math/eval.ts` |
-| `MATH ▸ CPX` | Complex operations live under their own names instead | partial | `conj(`, `real(`, `imag(`, `angle(`, `abs(` all exist |
-| `MATH ▸ NUM ▸ remainder(` | — | todo | — |
+| `MATH ▸ CPX` | The complex operations gathered where the device puts them | done | `lib/calc/menus.ts` |
+| `remainder(` | Two arguments, taking the sign of the divisor | done | `lib/math/eval.ts` |
 
 ## ANGLE
 
@@ -87,7 +87,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | Item | Behaviour | Status | Where |
 | --- | --- | --- | --- |
 | `TEST` | `=`, `≠`, `>`, `≥`, `<`, `≤` returning 1 or 0 | done | `lib/math/parser.ts` |
-| `LOGIC` | `and`, `or`, `xor`, `not(` | todo | comparisons exist; the connectives do not |
+| `LOGIC` | `and`, `or`, `xor`, `not(`, binding looser than the comparisons they join | done | `lib/math/parser.ts` |
 
 ## Graphing
 
@@ -230,7 +230,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | --- | --- | --- | --- |
 | `ClrAllLists` `ClrHome` | — | done | `lib/calc/menus.ts` |
 | `Reset RAM` | Back to a powered-on device | done | `lib/calc/store.ts` |
-| `Mem Mgmt` | Browsing and deleting individual variables | todo | — |
+| `Mem Mgmt` | Lists what is stored and deletes one at a time, staying open for the next | done | `lib/calc/store.ts` |
 
 ## APPS
 

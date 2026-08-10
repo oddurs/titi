@@ -22,6 +22,19 @@ export const FIXTURES: Record<string, () => Device> = {
 
   "home-error": () => device().type("1/0").press("enter"),
 
+  "home-error-goto": () => device().type("2+*3").press("enter"),
+
+  "menu-rcl": () =>
+    device().type("7").press("sto▸").press("alpha A").press("enter").press("2nd rcl"),
+
+  "menu-memory": () =>
+    device().type("7").press("sto▸").press("alpha A").press("enter")
+      .press("2nd mem").choose("Mem Mgmt"),
+
+  "menu-logic": () => device().press("2nd test").press("right"),
+
+  "menu-cpx": () => device().press("math").repeat("right", 2),
+
   "home-complex": () =>
     device()
       .press("mode").repeat("down", 4).press("right").press("2nd quit")

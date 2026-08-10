@@ -15,6 +15,8 @@ import type { CalcState } from "./store";
 export interface GraphingCtx {
   get(): CalcState;
   set(patch: Partial<CalcState>): void;
+  /** a running program asked for a point on the graph */
+  provideProgramPoint(x: number, y: number): void;
   env: Env;
   note(message: string | null): void;
   persist(): void;
@@ -23,7 +25,7 @@ export interface GraphingCtx {
 }
 
 export function createGraphing(ctx: GraphingCtx) {
-  const { get, set, env, note, persist, numberFromEntry } = ctx;
+  const { get, set, env, note, persist, numberFromEntry, provideProgramPoint } = ctx;
 
 // -- graph helpers --------------------------------------------------------
 
@@ -199,8 +201,10 @@ function startDraw(op: string) {
  */
 function nudgeCursor(dx: number, dy: number): boolean {
   const st = get();
-  if (!st.graphPrompt?.op.startsWith("draw:")) return false;
-  if (st.graphPrompt.stage === 1 && st.graphPrompt.op === "draw:text") return false;
+  const wants = st.graphPrompt?.op;
+  if (!wants || (!wants.startsWith("draw:") && wants !== "prgm:point")) return false;
+  // Text is typed once its place is chosen, so the arrows go back to editing.
+  if (wants === "draw:text" && st.graphPrompt?.stage === 1) return false;
   const c = st.cursor ?? centreCursor();
   const w = st.win;
   set({
@@ -349,6 +353,11 @@ function resolveGraphPrompt() {
   const p = st.graphPrompt;
   if (!p) return false;
   if (p.op.startsWith("draw:")) return resolveDraw(p.op.slice(5), p.stage);
+  if (p.op === "prgm:point") {
+    const c = st.cursor ?? centreCursor();
+    provideProgramPoint(c.x, c.y);
+    return true;
+  }
   const idx = currentTraceFn();
   const f = idx >= 0 ? makeSampler(idx) : null;
 

@@ -24,24 +24,10 @@ day with tests, `L` needs a design decision first.
 | 5 | The things that were stored and ignored — `Indpnt: Ask`, programs that ask and draw, offline and installable | `bfc35e8` |
 | — | The spec itself, and a test that keeps it honest | `bc417cb` |
 | 6 | The rest of the statistics — frequency lists, Med-Med, CubicReg and QuartReg, modified box plots | `6d5ad82` |
-| 7 | Distributions and probability — Poisson, geometric, t, χ², F, invT, and the counting functions | pending |
+| 7 | Distributions and probability — Poisson, geometric, t, χ², F, invT, and the counting functions | `88639e0` |
+| 8 | Programs that react — getKey, a placed Output(, IS>( and DS<(, and Input on the graph | pending |
 
 ---
-
-## Sprint 8 — Programs that react
-
-**Why now.** The interpreter suspends for `Input`, `Prompt`, `Pause` and now
-`Menu(`, which means the hard part — a program counter with an explicit call
-stack — is built and proven. `getKey` is the one thing that needs more than
-that, and it is what separates a program that computes from a program you can
-play with.
-
-| Spec row | What it takes | Size |
-| --- | --- | --- |
-| `getKey` | A value inside an expression, so the interpreter needs a yield point mid-expression rather than only between statements. That is the design decision; everything after it is small. Do not fake it — a version that always returns 0 spins to the step limit. | L |
-| `Input` into a graph screen | `Input` with no argument puts a free cursor on the graph and stores where it lands. The cursor and the prompt machinery both exist from DRAW. | M |
-| `IS>(` `DS<(` | Increment or decrement, then skip the next line on the comparison. Small once the statement table is open. | S |
-| `Disp` `Output(` | `Output(` takes a row and column and currently ignores both. Honouring them means the program output area is addressed rather than scrolled. | M |
 
 ## Sprint 9 — The graph's last controls
 

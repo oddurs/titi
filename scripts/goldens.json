@@ -496,6 +496,25 @@
       "-8"
     ]
   },
+  "prgm-waiting-for-a-key": {
+    "digest": "3b02eedd",
+    "transcript": [
+      "PRGM RAD",
+      "PRESS A KEY",
+      "PRESS ENTER"
+    ]
+  },
+  "prgm-output-placed": {
+    "digest": "cbf5cf40",
+    "transcript": [
+      "PRGM RAD",
+      "PRESS A KEY",
+      "CODE 72",
+      "ON QUITS",
+      "DONE",
+      "PRESS ENTER"
+    ]
+  },
   "solver": {
     "digest": "856de812",
     "transcript": [
@@ -561,13 +580,14 @@
     ]
   },
   "menu-prgm": {
-    "digest": "93f45b91",
+    "digest": "37086d69",
     "transcript": [
       "HOME EXEC EDIT NEW RAD",
       "1:QUADRAT",
       "2:COLLATZ",
       "3:FIB",
       "4:SHAPES",
+      "5:KEYPAD",
       "READY",
       ">"
     ]

@@ -587,6 +587,14 @@ function renderPrgmRun(pen: Pen, s: CalcState, top: number) {
     pen.text(0, row, pen.clip(l, pen.textCols), isErr ? INK.rose : INK.on);
   });
 
+  // Output( addresses the screen directly, so it goes on top of the scroll.
+  for (const at of run.placed) {
+    const row = first + at.row;
+    if (row < first || row > lastRow) continue;
+    if (at.col >= pen.textCols) continue;
+    pen.text(at.col, row, pen.clip(at.text, pen.textCols - at.col), INK.on);
+  }
+
   const row = pen.textRows - 1;
   if (run.status === "input") {
     const prompt = pen.clip(run.prompt ?? "?", 8);

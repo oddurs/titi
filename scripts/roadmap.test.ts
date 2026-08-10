@@ -102,7 +102,14 @@ describe("the sprints are worth doing separately");
     ok(`${name} has enough in it to be a sprint`, count >= 2, `${count} items`);
     ok(`${name} is not a dumping ground`, count <= 8, `${count} items`);
   }
-  ok("there are several of them", bySprint.size >= 3, `${bySprint.size}`);
+  // The plan shrinks as sprints ship, so the useful invariant is not "several"
+  // but "one for as long as anything is missing".
+  const outstanding = spec.filter((r) => r.status === "todo").length;
+  ok(
+    "there is a sprint for as long as anything is missing",
+    outstanding === 0 || bySprint.size >= 1,
+    `${bySprint.size} sprints for ${outstanding} missing`,
+  );
 }
 
 describe("what is left");

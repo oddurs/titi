@@ -31,6 +31,14 @@ export interface Env {
   seqTerms?: Record<string, (n: number) => number>;
   /** When true, domain errors yield NaN instead of throwing (plotting/tables). */
   lenient: boolean;
+  /**
+   * The key pressed since a program last looked, and whether the last look
+   * found nothing. `getKey` reads and clears the first and sets the second;
+   * the interpreter watches the second so it can hand the screen back rather
+   * than spinning on an empty keyboard.
+   */
+  lastKey?: number;
+  keyEmpty?: boolean;
 }
 
 export function makeEnv(partial: Partial<Env> = {}): Env {
@@ -592,6 +600,17 @@ export function compile(node: Node): Fn {
         case "Ans": return (env) => env.ans;
         case "i": return () => C.cx(0, 1);
         case "E": return () => 10;
+        case "getKey":
+          // Reading takes the key, as on the device — a second read in the
+          // same pass gets 0. The flag lets the interpreter tell the caller
+          // that the program is waiting on the keyboard rather than working.
+          return (env) => {
+            const code = env.lastKey ?? 0;
+            env.lastKey = 0;
+            // Only an empty keyboard is worth handing the screen back for.
+            env.keyEmpty = code === 0;
+            return code;
+          };
         default: return () => 0;
       }
     }

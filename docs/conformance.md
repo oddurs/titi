@@ -196,7 +196,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | Item | Behaviour | Status | Where |
 | --- | --- | --- | --- |
 | Editor | Line-based, in the panel | done | `lib/display/screens.ts` |
-| `Disp` `Output(` | `Output(` accepts a position and ignores it — this display scrolls | partial | `lib/math/program.ts` |
+| `Disp` `Output(` | `Disp` scrolls, `Output(` is placed at a row and column and laid over it | done | `lib/math/program.ts` |
 | `Input` `Prompt` | Suspend for the user and resume | done | `scripts/program.test.ts` |
 | `If` `Then` `Else` `End` | — | done | `scripts/program.test.ts` |
 | `For(` `While` `Repeat` | — | done | `scripts/program.test.ts` |
@@ -205,9 +205,9 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | `ClrHome` `ClrList` `DelVar` | — | done | `lib/math/program.ts` |
 | `prgm` | Calls another program, with a real call stack | done | `scripts/program.test.ts` |
 | Drawing from a program | `Line(`, `Horizontal`, `Vertical`, `Circle(`, `Text(`, `Pt-On(`, `Pt-Off(`, `ClrDraw` | done | `lib/calc/programs.ts` |
-| `getKey` | A value inside an expression, and the interpreter has no yield point mid-expression | todo | needs a yield model, not a corner of one |
-| `IS>(` `DS<(` | — | todo | — |
-| `Input` into a graph screen | — | todo | — |
+| `getKey` | Reads and clears the last key, and hands the screen back on an empty keyboard so the loop stays escapable | done | `scripts/program.test.ts` |
+| `IS>(` `DS<(` | Count, then skip the next line past the bound | done | `lib/math/program.ts` |
+| `Input` into a graph screen | A bare `Input` hands over the graph and stores the cursor in X and Y | done | `lib/calc/programs.ts` |
 | `Asm(` | There is no Z80 here | out-of-scope | — |
 
 ## MODE

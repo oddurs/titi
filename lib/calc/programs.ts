@@ -27,6 +27,25 @@ export function createPrograms(ctx: ProgramsCtx) {
 
 /** The live interpreter is deliberately outside reactive state. */
 let vm: Interpreter | null = null;
+/** The pending re-pump while a program watches the keyboard. */
+let keyTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelResume() {
+  if (keyTimer !== null) clearTimeout(keyTimer);
+  keyTimer = null;
+}
+
+function scheduleResume() {
+  cancelResume();
+  // About a frame. Fast enough to feel live, slow enough that a program
+  // spinning on getKey costs nothing.
+  keyTimer = setTimeout(() => {
+    keyTimer = null;
+    if (vm && get().screen === "prgmrun" && get().prgmRun?.status === "key") {
+      pumpProgram();
+    }
+  }, 16);
+}
 
 /** Turn what a program asked for into something the graph can draw. */
 function toDrawing(c: DrawCommand): Drawing | null {
@@ -65,7 +84,11 @@ function pumpProgram() {
   const st = get();
   const status = vm.run();
   drainDraws();
-  const base = { name: st.prgmRun?.name ?? "", output: [...vm.output] };
+  const base = {
+    name: st.prgmRun?.name ?? "",
+    output: [...vm.output],
+    placed: vm.placed.map((p) => ({ ...p })),
+  };
 
   if (status.kind === "menu") {
     // A program's menu is the device's menu, so it uses the same one.
@@ -87,12 +110,30 @@ function pumpProgram() {
       prgmRun: { ...base, status: "input", prompt: status.prompt },
       entry: { text: "", caret: 0 },
     });
+  } else if (status.kind === "point") {
+    // Hand the graph over with a free cursor on it; ENTER there resumes.
+    const win = st.win;
+    set({
+      prgmRun: { ...base, status: "point" },
+      screen: "graph",
+      trace: null,
+      cursor: st.cursor ?? { x: (win.xmin + win.xmax) / 2, y: (win.ymin + win.ymax) / 2 },
+      graphPrompt: { op: "prgm:point", stage: 0 },
+      message: "Move to a point, then press enter",
+    });
+  } else if (status.kind === "key") {
+    // The program is watching the keyboard. Give the screen back, then run it
+    // again in a moment — a keypress in between lands in env.lastKey.
+    set({ prgmRun: { ...base, status: "key" } });
+    scheduleResume();
   } else if (status.kind === "pause") {
     set({ prgmRun: { ...base, status: "pause" } });
   } else if (status.kind === "error") {
+    cancelResume();
     set({ prgmRun: { ...base, status: "error", message: status.message } });
     vm = null;
   } else {
+    cancelResume();
     set({ prgmRun: { ...base, status: "done" } });
     vm = null;
   }
@@ -102,6 +143,7 @@ function pumpProgram() {
 }
 
 function startProgram(name: string) {
+  cancelResume();
   const st = get();
   const src = st.programs.find((p) => p.name === name);
   if (!src) return note("ERR: UNDEFINED");
@@ -118,7 +160,7 @@ function startProgram(name: string) {
     message: null,
     target: { kind: "home" },
     entry: { text: "", caret: 0 },
-    prgmRun: { name, output: [], status: "pause" },
+    prgmRun: { name, output: [], placed: [], status: "pause" },
   });
   pumpProgram();
 }
@@ -151,6 +193,29 @@ function newProgram() {
     provideInput: (text: string) => vm?.provideInput(text),
     /** Continue past a Pause. */
     resumeProgram: () => vm?.resume(),
+    /**
+     * Hand a keypress to a program that is watching for one. Returns true when
+     * the program took it, so the key does not also do its usual job.
+     */
+    offerKey: (code: number) => {
+      if (!vm || get().prgmRun?.status !== "key") return false;
+      env.lastKey = code;
+      cancelResume();
+      pumpProgram();
+      return true;
+    },
+    /** The cursor was placed for a bare Input; store it and carry on. */
+    provideProgramPoint: (x: number, y: number) => {
+      if (!vm) return;
+      vm.providePoint(x, y);
+      set({ screen: "prgmrun", graphPrompt: null, message: null });
+      pumpProgram();
+    },
+    /** Stop the re-pump when the program screen is left behind. */
+    stopProgram: () => {
+      cancelResume();
+      vm = null;
+    },
     /** A choice was made in a program's Menu(; continue from its label. */
     chooseProgramMenu: (target: string) => {
       vm?.chooseMenu(target);

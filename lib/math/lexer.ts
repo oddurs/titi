@@ -260,6 +260,11 @@ export function lex(src: string): Token[] {
       i += 3;
       continue;
     }
+    if (src.startsWith("getKey", i)) {
+      push("const", "getKey", "getKey", i);
+      i += 6;
+      continue;
+    }
     if (src.startsWith("rand", i)) {
       push("const", "rand", "rand", i);
       i += 4;

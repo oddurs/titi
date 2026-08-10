@@ -194,6 +194,11 @@ export const FIXTURES: Record<string, () => Device> = {
   "prgm-drawn": () =>
     device().press("prgm").repeat("down", 3).press("enter").press("enter").press("graph"),
 
+  "prgm-waiting-for-a-key": () => device().press("prgm").choose("KEYPAD"),
+
+  "prgm-output-placed": () =>
+    device().press("prgm").choose("KEYPAD").press("7"),
+
   solver: () =>
     device()
       .press("math").repeat("down", 9).press("enter")

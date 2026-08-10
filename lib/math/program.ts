@@ -16,6 +16,10 @@ export type Status =
   | { kind: "error"; message: string; line: number }
   | { kind: "input"; prompt: string; target: string }
   | { kind: "menu"; title: string; options: { label: string; target: string }[] }
+  /** the program looked at the keyboard and found nothing; run it again soon */
+  | { kind: "key" }
+  /** a bare Input: show the graph and store where the cursor lands */
+  | { kind: "point" }
   | { kind: "pause" };
 
 /**
@@ -85,7 +89,7 @@ function keyword(line: string): string {
   for (const k of [
     "Disp", "Output(", "Input", "Prompt", "If", "Then", "Else", "End",
     "For(", "While", "Repeat", "Lbl", "Goto", "Pause", "Stop", "Return",
-    "ClrHome", "ClrList", "DelVar", "prgm", "Menu(",
+    "ClrHome", "ClrList", "DelVar", "prgm", "Menu(", "IS>(", "DS<(",
     "Line(", "Horizontal", "Vertical", "Circle(", "Text(", "Pt-On(", "Pt-Off(",
     "ClrDraw",
   ]) {
@@ -144,6 +148,12 @@ export class Interpreter {
   readonly output: string[] = [];
   /** what the program has asked to be drawn, for the caller to drain */
   readonly draws: DrawCommand[] = [];
+  /**
+   * Text put somewhere specific by Output(, as opposed to Disp's scroll.
+   * The device has one screen and both write to it, so they are kept apart
+   * here and laid over one another when drawn.
+   */
+  readonly placed: { row: number; col: number; text: string }[] = [];
   private stack: Frame[] = [];
   private pending: { target: string; prompt: string } | null = null;
   private steps = 0;
@@ -158,6 +168,12 @@ export class Interpreter {
     private maxSteps = 200_000,
   ) {
     this.stack.push(parseProgram(entry.name, entry.body));
+  }
+
+  /** Store where the cursor was left, for a bare Input. */
+  providePoint(x: number, y: number) {
+    this.env.vars.X = x;
+    this.env.vars.Y = y;
   }
 
   /** Continue from the label a Menu( choice named. */
@@ -223,7 +239,13 @@ export class Interpreter {
       }
 
       try {
+        this.env.keyEmpty = false;
         const status = this.exec(f, line);
+        // A statement that read getKey and found nothing hands the screen
+        // back, so the display paints and a keypress can arrive. The caller
+        // runs it again — which is what makes `Repeat getKey` a loop the user
+        // can actually escape, rather than a spin to the step limit.
+        if (!status && this.env.keyEmpty) return { kind: "key" };
         if (status) return status;
       } catch (e) {
         this.halted = true;
@@ -248,10 +270,23 @@ export class Interpreter {
       }
 
       case "Output(": {
-        // Row and column are accepted and ignored — this display scrolls.
+        // Output(row, column, thing) — the device counts both from one.
         const parts = splitTop(argsOf(line, "Output("));
-        const last = parts[parts.length - 1];
-        if (last !== undefined) this.print(this.value(last));
+        if (parts.length < 3) throw new CalcError("ERR: ARGUMENT");
+        const at = parts.slice(0, 2).map((a) => {
+          const v = evaluate(a, this.env);
+          if (typeof v !== "number") throw new CalcError("ERR: DATA TYPE");
+          return Math.round(v);
+        });
+        const text = parts.slice(2).map((a) => this.value(a)).join("");
+        const row = at[0] - 1;
+        const col = at[1] - 1;
+        if (row < 0 || col < 0) throw new CalcError("ERR: DOMAIN");
+        // Writing over the same spot replaces what was there, as it would on
+        // a real screen — otherwise a loop that counts down leaves a trail.
+        const existing = this.placed.findIndex((p) => p.row === row && p.col === col);
+        if (existing >= 0) this.placed.splice(existing, 1);
+        this.placed.push({ row, col, text });
         f.pc += 1;
         return;
       }
@@ -259,6 +294,12 @@ export class Interpreter {
       case "Input":
       case "Prompt": {
         const parts = splitTop(argsOf(line, kw));
+        // A bare Input asks for a place rather than a value: the device shows
+        // the graph and stores where the cursor is left.
+        if (kw === "Input" && (!parts.length || parts[0] === "")) {
+          f.pc += 1;
+          return { kind: "point" };
+        }
         if (kw === "Prompt") {
           // Prompt A,B asks for each in turn; ask for the first still unset.
           const target = parts[0];
@@ -289,6 +330,23 @@ export class Interpreter {
         // Land on the line after the menu when the chosen label is resumed.
         f.pc += 1;
         return { kind: "menu", title, options };
+      }
+
+      case "IS>(":
+      case "DS<(": {
+        // IS>(A,10): add one to A, and if it is now past 10, skip the next
+        // line. DS<( counts the other way. The skip is the whole point — it is
+        // how a loop is written without a For.
+        const [name, boundSrc] = splitTop(argsOf(line, kw));
+        if (!name || boundSrc === undefined) throw new CalcError("ERR: SYNTAX");
+        const step = kw === "IS>(" ? 1 : -1;
+        const next = (this.env.vars[name.trim()] ?? 0) + step;
+        this.env.vars[name.trim()] = next;
+        const bound = evaluate(boundSrc, this.env);
+        if (typeof bound !== "number") throw new CalcError("ERR: DATA TYPE");
+        const skip = step > 0 ? next > bound : next < bound;
+        f.pc += skip ? 2 : 1;
+        return;
       }
 
       case "ClrDraw":
@@ -453,6 +511,7 @@ export class Interpreter {
       }
 
       case "ClrHome":
+        this.placed.length = 0;
         this.output.length = 0;
         f.pc += 1;
         return;
@@ -562,6 +621,20 @@ export const SAMPLE_PROGRAMS: ProgramSource[] = [
       'Pt-On(X,4sin(X))',
       'End',
       'Text(1,1,"WAVE")',
+    ].join("\n"),
+  },
+  {
+    name: "KEYPAD",
+    body: [
+      'ClrHome',
+      'Output(1,1,"PRESS A KEY")',
+      '0→K',
+      'Repeat K',
+      'getKey→K',
+      'End',
+      'Output(3,1,"CODE")',
+      'Output(3,6,K)',
+      'Output(5,1,"ON QUITS")',
     ].join("\n"),
   },
 ];

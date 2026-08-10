@@ -168,3 +168,25 @@ export function stepFocus(fromId: string, dRow: number, dCol: number): string {
   }
   return from.id;
 }
+
+/**
+ * The code `getKey` reports for each key.
+ *
+ * The device numbers by position — ten times the row, plus the column, both
+ * counted from one — so this is derived from the faceplate rather than typed
+ * out again. The arrow cluster sits outside the grid and keeps the codes the
+ * device gives it.
+ */
+const ARROW_CODES: Record<string, number> = { up: 25, left: 24, right: 26, down: 34 };
+
+export const KEY_CODES: Record<string, number> = (() => {
+  const out: Record<string, number> = { ...ARROW_CODES };
+  KEY_ROWS.forEach((row, r) => {
+    row.forEach((k, c) => {
+      if (k) out[k.id] = (r + 1) * 10 + (c + 1);
+    });
+  });
+  return out;
+})();
+
+export const keyCode = (id: string) => KEY_CODES[id] ?? 0;

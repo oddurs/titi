@@ -59,7 +59,8 @@ eq("Disp a value", run("Disp 6*7"), ["42"]);
 eq("Disp several arguments", run('Disp "A",1,2'), ["A", "1", "2"]);
 eq("a bare expression displays", run("2+2"), ["4"]);
 eq("a store is silent", run("5→A"), []);
-eq("Output ignores position", run('Output(1,1,"X")'), ["X"]);
+// Output( no longer scrolls — it is placed, and has its own section below.
+eq("Output does not scroll", run('Output(1,1,"X")'), []);
 eq("ClrHome wipes earlier output", run('Disp "A"\nClrHome\nDisp "B"'), ["B"]);
 
 describe("stores and variables");
@@ -225,5 +226,89 @@ describe("a program can draw");
 }
 eq("a drawing of a list is a data type error",
   run('Line(1,2,3,{1,2})'), ["ERR: DATA TYPE"]);
+
+describe("IS> and DS< count and skip");
+{
+  eq("IS>( skips once it is past the bound",
+    run(["1→A", "IS>(A,3)", 'Disp "NOT PAST"', 'Disp A'].join("\n")), ["NOT PAST", "2"]);
+  eq("and does skip when it is",
+    run(["3→A", "IS>(A,3)", 'Disp "SKIPPED"', 'Disp A'].join("\n")), ["4"]);
+  eq("DS<( counts the other way",
+    run(["3→B", "DS<(B,1)", 'Disp "NOT PAST"', 'Disp B'].join("\n")), ["NOT PAST", "2"]);
+  eq("and skips below the bound",
+    run(["1→B", "DS<(B,1)", 'Disp "SKIPPED"', 'Disp B'].join("\n")), ["0"]);
+  eq("the bound may be an expression",
+    run(["0→A", "2→N", "IS>(A,N)", 'Disp "HERE"'].join("\n")), ["HERE"]);
+  eq("a missing bound is a syntax error", run("IS>(A)"), ["ERR: SYNTAX"]);
+}
+
+describe("Output( goes where it is told");
+{
+  const env = makeEnv();
+  const vm = new Interpreter(
+    { name: "O", body: ['Output(2,3,"HI")', 'Output(4,1,7*6)', 'Disp "SCROLL"'].join("\n") },
+    env,
+    fmt,
+  );
+  vm.run();
+  eq("both are placed", vm.placed.length, 2);
+  eq("counting rows and columns from one", vm.placed[0], { row: 1, col: 2, text: "HI" });
+  eq("and the value is formatted", vm.placed[1].text, "42");
+  eq("while Disp still scrolls", vm.output, ["SCROLL"]);
+}
+{
+  const env = makeEnv();
+  const vm = new Interpreter(
+    { name: "O", body: ['Output(1,1,"AAA")', 'Output(1,1,"B")', "ClrHome", 'Output(2,2,"C")'].join("\n") },
+    env,
+    fmt,
+  );
+  vm.run();
+  eq("writing over a spot replaces it, and ClrHome empties the screen",
+    vm.placed, [{ row: 1, col: 1, text: "C" }]);
+}
+eq("a bare Output( is an argument error", run("Output(1,1)"), ["ERR: ARGUMENT"]);
+
+describe("getKey watches the keyboard without spinning");
+{
+  const env = makeEnv();
+  const vm = new Interpreter(
+    { name: "K", body: ["0→K", "Repeat K", "getKey→K", "End", "Disp K"].join("\n") },
+    env,
+    fmt,
+  );
+  eq("an empty keyboard hands the screen back", vm.run().kind, "key");
+  eq("and again, rather than spinning to the step limit", vm.run().kind, "key");
+  env.lastKey = 72;
+  eq("a key lets it finish", vm.run().kind, "done");
+  eq("and the program saw the code", vm.output, ["72"]);
+}
+{
+  // A single read is not a loop: it takes whatever is waiting and moves on,
+  // which is 0 if nothing was pressed — the device does the same.
+  const env = makeEnv();
+  env.lastKey = 25;
+  const vm = new Interpreter({ name: "K", body: "getKey→A\nDisp A" }, env, fmt);
+  eq("with a key waiting it does not stop", vm.run().kind, "done");
+  eq("reading takes the key", env.lastKey, 0);
+  eq("and reports it once", vm.output, ["25"]);
+}
+{
+  const env = makeEnv();
+  const vm = new Interpreter({ name: "K", body: "getKey→A\nDisp A" }, env, fmt);
+  vm.run();
+  vm.run();
+  eq("with none waiting it reads zero and carries on", vm.output, ["0"]);
+}
+
+describe("a bare Input asks for a place");
+{
+  const env = makeEnv();
+  const vm = new Interpreter({ name: "P", body: "Input\nDisp X,Y" }, env, fmt);
+  eq("it suspends for a point", vm.run().kind, "point");
+  vm.providePoint(3, -4);
+  eq("then carries on", vm.run().kind, "done");
+  eq("with the cursor stored in X and Y", vm.output, ["3", "-4"]);
+}
 
 reportIfMain(import.meta.url);

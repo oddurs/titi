@@ -5,7 +5,7 @@ import { CalcError, clearYCache, evaluate, makeEnv, type Env } from "../math/eva
 import { formatMatrixRows, formatNumber, formatValue, toDMS, toFraction } from "../math/format";
 import { isMatrix } from "../math/matrix";
 import { nextBoundary, prevBoundary } from "../math/lexer";
-import { keyById } from "./keys";
+import { keyById, keyCode } from "./keys";
 import { MENUS } from "./menus";
 import type { StatReport } from "../math/stats";
 import { createReports } from "./reports";
@@ -630,6 +630,9 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
 
   const graphing = createGraphing({
     get, set, env, note, persist, numberFromEntry,
+    // The programs module is built after this one, so the call is forwarded
+    // rather than passed — the graph asks for it long after both exist.
+    provideProgramPoint: (x, y) => provideProgramPoint(x, y),
   });
   const {
     applyZoom, runCalc, resolveGraphPrompt,
@@ -663,7 +666,8 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
 
   const {
     pumpProgram, startProgram, editProgram, newProgram,
-    provideInput, resumeProgram, chooseProgramMenu,
+    provideInput, resumeProgram, chooseProgramMenu, offerKey, stopProgram,
+    provideProgramPoint,
   } = createPrograms({
     get, set, env, note, persist, syncEnv, gotoScreen,
   });
@@ -904,6 +908,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         return;
 
       case "quit":
+        if (st.screen === "prgmrun") stopProgram();
         if (st.menu) return set({ menu: null });
         if (st.graphPrompt) return set({ graphPrompt: null, message: null });
         commitTarget();
@@ -1188,6 +1193,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       }
 
       case "reset":
+        stopProgram();
         set({
           screen: "home",
           history: [],
@@ -1273,6 +1279,12 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       const key = keyById(id);
       if (!key) return;
       const st = get();
+
+      // A program watching the keyboard gets the key instead of the device —
+      // except ON, which is how you get out of a program that never stops.
+      if (st.prgmRun?.status === "key" && id !== "on" && offerKey(keyCode(id))) {
+        return;
+      }
 
       const isModKey = key.role === "mod2nd" || key.role === "modalpha";
       // ENTER ends A-lock and acts as ENTER — it does not type its own alpha

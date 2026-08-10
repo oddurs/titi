@@ -13,8 +13,10 @@ export interface SolverState {
 export interface PrgmRun {
   name: string;
   output: string[];
+  /** text put somewhere specific by Output(, laid over the scroll */
+  placed: { row: number; col: number; text: string }[];
   /** what the interpreter is waiting for, if anything */
-  status: "input" | "pause" | "done" | "error";
+  status: "input" | "pause" | "done" | "error" | "key" | "point";
   prompt?: string;
   message?: string;
 }

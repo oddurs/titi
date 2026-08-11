@@ -54,10 +54,6 @@ const planned = (why: string, names: string[]) => {
 
 planned("choosing points off a plot, which is interactive", ["Select("]);
 planned("the elementary row operations", ["row+(", "rowSwap(", "*row(", "*row+("]);
-planned("a clock, which a browser does have", [
-  "ClockOff", "ClockOn", "checkTmr(", "dayOfWk(", "getDtStr(", "getTmStr(",
-  "setDate(", "setDtFmt(", "setTime(", "setTmFmt(", "timeCnv(", "startTmr",
-]);
 planned("regression forms the STAT CALC menu does not reach", ["LinReg("]);
 
 // ---------------------------------------------------------------------------

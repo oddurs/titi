@@ -248,7 +248,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | --- | --- | --- | --- |
 | `ClrAllLists` `ClrHome` | — | done | `lib/calc/menus.ts` |
 | `Reset RAM` | Back to a powered-on device | done | `lib/calc/store.ts` |
-| The clock | `ClockOn`, `getTmStr(`, `setDate(`, `dayOfWk(`, `timeCnv(` and the rest — a browser does have a clock, which is why this is not refused | todo | — |
+| The clock | Twelve commands over an offset from the host clock, so setting the time means something without touching the computer's | done | `scripts/store.test.ts` |
 | `Mem Mgmt` | Lists what is stored and deletes one at a time, staying open for the next | done | `lib/calc/store.ts` |
 
 ## APPS

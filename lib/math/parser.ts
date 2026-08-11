@@ -30,6 +30,7 @@ const ARITY: Record<string, [number, number]> = {
   rectToR: [2, 2], rectToTheta: [2, 2], polarToX: [2, 2], polarToY: [2, 2],
   sortA: [1, 1], sortD: [1, 1], cumSum: [1, 1], deltaList: [1, 1], prod: [1, 3],
   expr: [1, 1], length: [1, 1], sub: [3, 3], inString: [2, 3],
+  getTmStr: [0, 1], getDtStr: [0, 1], dayOfWk: [3, 3], timeCnv: [1, 1], checkTmr: [1, 1],
   poissonpdf: [2, 2], poissoncdf: [2, 2], geometpdf: [2, 2], geometcdf: [2, 2],
   tpdf: [2, 2], tcdf: [2, 3], invT: [2, 2],
   chi2pdf: [2, 2], chi2cdf: [2, 3], Fpdf: [3, 3], Fcdf: [3, 4],

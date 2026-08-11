@@ -31,6 +31,11 @@ export interface Env {
   seqTerms?: Record<string, (n: number) => number>;
   /** Str0..Str9 */
   strs: Record<string, string>;
+  /**
+   * The device's own clock: an offset from the host's, so setting the time
+   * means something without anyone having to touch the computer's.
+   */
+  clock: { on: boolean; offsetMs: number; dateFmt: 1 | 2 | 3; timeFmt: 12 | 24 };
   /** When true, domain errors yield NaN instead of throwing (plotting/tables). */
   lenient: boolean;
   /**
@@ -54,6 +59,7 @@ export function makeEnv(partial: Partial<Env> = {}): Env {
     ys: {},
     mats: {},
     strs: {},
+    clock: { on: true, offsetMs: 0, dateFmt: 1, timeFmt: 24 },
     angle: "rad",
     complex: "real",
     ans: 0,
@@ -627,6 +633,9 @@ export function compile(node: Node): Fn {
         case "Ans": return (env) => env.ans;
         case "i": return () => C.cx(0, 1);
         case "E": return () => 10;
+        case "startTmr":
+          // A moment to measure from, in whole seconds.
+          return (env) => Math.floor(deviceNow(env).getTime() / 1000);
         case "getKey":
           // Reading takes the key, as on the device — a second read in the
           // same pass gets 0. The flag lets the interpreter tell the caller
@@ -1016,6 +1025,50 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
       // The engine calling itself: the string is parsed and run as if it had
       // been typed. Nothing is memoised, since the text can change each time.
       return (env) => evaluate(asText(a[0](env)), env);
+
+    // -- the clock ----------------------------------------------------------
+    case "getTmStr":
+      return (env) => {
+        const d = deviceNow(env);
+        const fmt = a[0] ? num(a[0](env)) : env.clock.timeFmt;
+        const h = d.getHours();
+        const hour = fmt === 12 ? ((h + 11) % 12) + 1 : h;
+        const body = `${pad2(hour)}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+        return fmt === 12 ? `${body} ${h < 12 ? "AM" : "PM"}` : body;
+      };
+
+    case "getDtStr":
+      return (env) => {
+        const d = deviceNow(env);
+        const fmt = a[0] ? num(a[0](env)) : env.clock.dateFmt;
+        const [y, m, day] = [d.getFullYear(), d.getMonth() + 1, d.getDate()];
+        if (fmt === 2) return `${day}/${m}/${y}`;
+        if (fmt === 3) return `${y}/${m}/${day}`;
+        return `${m}/${day}/${y}`;
+      };
+
+    case "dayOfWk":
+      // 1 is Sunday, as the device counts.
+      return (env) => {
+        const [y, m, d] = [num(a[0](env)), num(a[1](env)), num(a[2](env))];
+        return new Date(y, m - 1, d).getDay() + 1;
+      };
+
+    case "timeCnv":
+      // Seconds as days, hours, minutes, seconds.
+      return (env) => {
+        let left = Math.max(0, Math.floor(num(a[0](env))));
+        const days = Math.floor(left / 86400);
+        left -= days * 86400;
+        const hours = Math.floor(left / 3600);
+        left -= hours * 3600;
+        const mins = Math.floor(left / 60);
+        return [days, hours, mins, left - mins * 60];
+      };
+
+    case "checkTmr":
+      // Seconds since the moment startTmr handed back.
+      return (env) => Math.floor(deviceNow(env).getTime() / 1000) - num(a[0](env));
 
     case "remainder":
       return (env) =>
@@ -1527,3 +1580,10 @@ export function sampler(src: string, env: Env, varName = "X"): (x: number) => nu
 export function clearYCache() {
   yCache.clear();
 }
+
+/** What time the device thinks it is: the host clock plus its own offset. */
+function deviceNow(env: Env): Date {
+  return new Date(Date.now() + (env.clock?.offsetMs ?? 0));
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");

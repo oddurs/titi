@@ -114,6 +114,8 @@ export interface CalcState {
   statFreq: string | null;
   /** Str0..Str9, kept beside the env copy the engine writes into */
   strs: Record<string, string>;
+  /** the device's own clock, offset from the host's */
+  clock: Env["clock"];
   lists: number[][];
   mats: Record<string, Matrix>;
   programs: ProgramSource[];
@@ -197,6 +199,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     // The engine writes into env.strs directly, so state follows it rather
     // than the other way round — the same deal the matrices have.
     if (s.strs) env.strs = { ...s.strs };
+    env.clock = st.clock;
     clearYCache();
   }
 
@@ -511,6 +514,56 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
           screen: "graph",
           revision: st.revision + 1,
         });
+        persist();
+        return true;
+      }
+
+      // -- the clock --------------------------------------------------------
+      case "ClockOn":
+      case "ClockOff": {
+        const clock = { ...st.clock, on: name === "ClockOn" };
+        set({ clock, revision: st.revision + 1 });
+        env.clock = clock;
+        persist();
+        return true;
+      }
+
+      case "setTime(":
+      case "setDate(": {
+        // Setting the time moves the device's offset from the host clock
+        // rather than pretending to move the computer's.
+        const now = new Date(Date.now() + st.clock.offsetMs);
+        const [a0, a1, a2] = args.map((v) => Math.round(v));
+        const wanted =
+          name === "setTime("
+            ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), a0, a1, a2)
+            : new Date(a0, a1 - 1, a2, now.getHours(), now.getMinutes(), now.getSeconds());
+        if (Number.isNaN(wanted.getTime())) {
+          note("ERR: DOMAIN");
+          return true;
+        }
+        const clock = { ...st.clock, offsetMs: wanted.getTime() - Date.now() };
+        set({ clock, revision: st.revision + 1 });
+        env.clock = clock;
+        persist();
+        return true;
+      }
+
+      case "setTmFmt(":
+      case "setDtFmt(": {
+        const v = Math.round(args[0]);
+        const ok =
+          name === "setTmFmt(" ? v === 12 || v === 24 : v === 1 || v === 2 || v === 3;
+        if (!ok) {
+          note("ERR: DOMAIN");
+          return true;
+        }
+        const clock =
+          name === "setTmFmt("
+            ? { ...st.clock, timeFmt: v as 12 | 24 }
+            : { ...st.clock, dateFmt: v as 1 | 2 | 3 };
+        set({ clock, revision: st.revision + 1 });
+        env.clock = clock;
         persist();
         return true;
       }
@@ -1636,6 +1689,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     plots: freshPlots(),
     statFreq: null,
     strs: {},
+    clock: { on: true, offsetMs: 0, dateFmt: 1, timeFmt: 24 },
     lists: Array.from({ length: 6 }, () => [] as number[]),
     mats: { "[A]": MX.identity(2) },
     programs: SAMPLE_PROGRAMS.map((p) => ({ ...p })),

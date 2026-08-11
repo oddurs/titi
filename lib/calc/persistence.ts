@@ -41,6 +41,7 @@ export interface SavedState {
   statFreq: string | null;
   /** Str0..Str9 */
   strs: Record<string, string>;
+  clock: { on: boolean; offsetMs: number; dateFmt: 1 | 2 | 3; timeFmt: 12 | 24 };
   mats: Record<string, Matrix>;
   programs: ProgramSource[];
   solver: SolverState;
@@ -59,6 +60,7 @@ export function defaultSave(): SavedState {
     plots: freshPlots(),
     statFreq: null,
     strs: {},
+    clock: { on: true, offsetMs: 0, dateFmt: 1, timeFmt: 24 },
     mats: { "[A]": identity(2) },
     programs: SAMPLE_PROGRAMS.map((p) => ({ ...p })),
     solver: {
@@ -84,6 +86,7 @@ export function serialize(state: SavedState): string {
     plots: state.plots,
     statFreq: state.statFreq,
     strs: state.strs,
+    clock: state.clock,
     mats: state.mats,
     programs: state.programs,
     solver: state.solver,
@@ -160,6 +163,13 @@ const validTbl = (v: unknown) =>
 const validPlots = (v: unknown) =>
   Array.isArray(v) && v.every((p) => isObject(p) && typeof p.on === "boolean");
 
+const validClock = (v: unknown) =>
+  isObject(v) &&
+  typeof v.on === "boolean" &&
+  isNum(v.offsetMs) &&
+  [1, 2, 3].includes(v.dateFmt as number) &&
+  [12, 24].includes(v.timeFmt as number);
+
 const validStrs = (v: unknown) =>
   isObject(v) && Object.entries(v).every(([k, t]) => /^Str\d$/.test(k) && isStr(t));
 
@@ -221,6 +231,7 @@ export function deserialize(raw: string | null): LoadResult {
     plots: take("plots", validPlots),
     statFreq: take("statFreq", validFreq),
     strs: take("strs", validStrs),
+    clock: take("clock", validClock),
     mats: take("mats", validMats),
     programs: take("programs", validPrograms),
     solver: take("solver", validSolver),

@@ -30,19 +30,10 @@ day with tests, `L` needs a design decision first.
 | 10 | Editing, memory and the engine's leftovers — error Goto, a real RCL, Mem Mgmt, the logic connectives, remainder(, the CPX tab | `63835b9` |
 | 11 | Modes as instructions — thirty settings given names, plus the axes, the traced expression, the coordinate format and Depend | `750fc25` |
 | 12 | Graph and table instructions — ten of them, and a window that remembers what it was | `ea4d696` |
-| 13 | Strings — a string in the value type, ten variables, and six functions | pending |
+| 13 | Strings — a string in the value type, ten variables, and six functions | `469bc72` |
+| 14 | The clock — twelve commands over an offset from the host's | pending |
 
 ---
-
-## Sprint 14 — The clock
-
-**Why now.** Refusing it was wrong: a browser has a clock. Twelve commands,
-all of them thin over `Date`, and they make the date and time formats on the
-MODE screen mean something.
-
-| Spec row | What it takes | Size |
-| --- | --- | --- |
-| The clock | `ClockOn`, `ClockOff`, `getTmStr(`, `getDtStr(`, `setTime(`, `setDate(`, `setTmFmt(`, `setDtFmt(`, `dayOfWk(`, `timeCnv(`, `startTmr`, `checkTmr(`. The device keeps its own offset from the host clock so setting the time means something. | M |
 
 ## Sprint 15 — Row operations
 

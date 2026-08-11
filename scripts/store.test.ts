@@ -1,5 +1,6 @@
 import { describe, eq, near, ok, reportIfMain } from "./harness";
 import { device } from "./device";
+import { MENUS } from "../lib/calc/menus";
 import { evaluate, makeEnv } from "../lib/math/eval";
 import { renderPanel } from "./panel";
 import { ALL_KEYS, ARROW_KEYS, NAV, stepFocus } from "../lib/calc/keys";
@@ -425,18 +426,25 @@ describe("the catalog");
   ok("symbols sort ahead of the letters", !/^[A-Za-z]/.test(items()[0].label));
 }
 {
+  // What the catalog holds changes as the engine grows, so the expectation is
+  // taken from the catalog rather than written down and broken later.
+  const entries = MENUS.catalog.tabs[0].items.map((i) => i.label);
+  const startingWith = (c: string) => entries.filter((l) => l.toLowerCase().startsWith(c));
+
   const d = device().press("2nd catalog").press("S");
   const at = () => d.get().menu!.tabs[0].items[d.get().menu!.index].label;
-  // The catalog holds the mode instructions too, so S reaches Sci first.
-  eq("a letter jumps to it", at(), "Sci");
+  eq("a letter jumps to the first entry under it", at(), startingWith("s")[0]);
   d.press("S");
-  eq("pressing it again walks the run", at(), "Seq");
+  eq("pressing it again walks the run", at(), startingWith("s")[1]);
   d.press("C");
-  eq("and another letter starts its own", at(), "ClrTable");
+  eq("and another letter starts its own", at(), startingWith("c")[0]);
 }
 {
+  const first = MENUS.catalog.tabs[0].items
+    .map((i) => i.label)
+    .filter((l) => l.toLowerCase().startsWith("c"))[0];
   const d = device().press("2nd catalog").press("C").press("enter");
-  eq("enter inserts the item, not its own alpha label", d.get().entry.text, "ClrTable");
+  eq("enter inserts the item, not its own alpha label", d.get().entry.text, first);
   eq("and A-lock is released", d.get().mod, "none");
 }
 {
@@ -730,6 +738,59 @@ describe("equations and strings change places");
   d.get().typeText('"KEEP"→Str3');
   d.press("enter");
   eq("stored", d.get().strs.Str3, "KEEP");
+}
+
+describe("the clock");
+{
+  // Every case sets the time first, so none of them depend on when the suite
+  // is run — the device keeps an offset from the host clock, not a copy.
+  const say = (d: ReturnType<typeof device>, line: string) => {
+    d.get().typeText(line);
+    d.press("enter");
+    return d.get().history.at(-1)?.output ?? "";
+  };
+  const at = (line: string) => {
+    const d = device();
+    say(d, "setDate(2030,7,4)");
+    say(d, "setTime(9,30,0)");
+    return say(d, line);
+  };
+
+  eq("the time comes back as it was set", at("getTmStr("), "09:30:00");
+  eq("and the date", at("getDtStr("), "7/4/2030");
+
+  const d = device();
+  say(d, "setDate(2030,7,4)");
+  say(d, "setTime(13,5,9)");
+  eq("twenty-four hours by default", say(d, "getTmStr("), "13:05:09");
+  say(d, "setTmFmt(12)");
+  eq("twelve puts the half-day on it", say(d, "getTmStr("), "01:05:09 PM");
+  say(d, "setDtFmt(2)");
+  eq("day before month", say(d, "getDtStr("), "4/7/2030");
+  say(d, "setDtFmt(3)");
+  eq("or year first", say(d, "getDtStr("), "2030/7/4");
+  eq("a format it does not have is refused", (say(d, "setDtFmt(9)"), d.get().message), "ERR: DOMAIN");
+
+  // The fourth of July 2030 is a Thursday, and the device counts Sunday as 1.
+  eq("dayOfWk counts from Sunday", at("dayOfWk(2030,7,4)"), "5");
+  eq("timeCnv splits seconds up", at("timeCnv(90061)"), "{1 1 1 1}");
+  eq("and rounds nothing away", at("timeCnv(59)"), "{0 0 0 59}");
+
+  eq("ClockOff is remembered", (say(d, "ClockOff"), d.get().clock.on), false);
+  eq("and ClockOn again", (say(d, "ClockOn"), d.get().clock.on), true);
+}
+{
+  // startTmr hands back a moment; checkTmr says how long since.
+  const d = device();
+  d.get().typeText("startTmr→T");
+  d.press("enter");
+  d.get().typeText("checkTmr(T)");
+  d.press("enter");
+  const since = Number(d.get().history.at(-1)?.output);
+  ok("no time has passed yet", since >= 0 && since < 5, `${since}`);
+  d.get().typeText("checkTmr(T-60)");
+  d.press("enter");
+  eq("and a minute earlier reads as a minute", Number(d.get().history.at(-1)?.output) >= 60, true);
 }
 
 reportIfMain(import.meta.url);

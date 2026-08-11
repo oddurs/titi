@@ -104,6 +104,11 @@ export const FUNCTIONS = [
   "χ²cdf(",
   "Fpdf(",
   "Fcdf(",
+  "getTmStr(",
+  "getDtStr(",
+  "dayOfWk(",
+  "timeCnv(",
+  "checkTmr(",
   "expr(",
   "length(",
   "sub(",
@@ -299,6 +304,11 @@ export function lex(src: string): Token[] {
     if (src.startsWith("Ans", i)) {
       push("const", "Ans", "Ans", i);
       i += 3;
+      continue;
+    }
+    if (src.startsWith("startTmr", i)) {
+      push("const", "startTmr", "startTmr", i);
+      i += 8;
       continue;
     }
     if (src.startsWith("getKey", i)) {

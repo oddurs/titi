@@ -102,6 +102,12 @@ export const DEVICE_COMMANDS: Record<string, { args: [number, number] }> = {
   "Pt-Change(": { args: [2, 2] },
   "Equ▸String(": { args: [2, 2] },
   "String▸Equ(": { args: [2, 2] },
+  ClockOn: { args: [0, 0] },
+  ClockOff: { args: [0, 0] },
+  "setTime(": { args: [3, 3] },
+  "setDate(": { args: [3, 3] },
+  "setTmFmt(": { args: [1, 1] },
+  "setDtFmt(": { args: [1, 1] },
 };
 
 export const DEVICE_COMMAND_NAMES = Object.keys(DEVICE_COMMANDS);

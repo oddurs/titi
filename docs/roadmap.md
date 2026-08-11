@@ -31,12 +31,61 @@ day with tests, `L` needs a design decision first.
 
 ---
 
-## Nothing scheduled
+## Sprint 11 — Modes as instructions
 
-The spec has no `todo` rows left: everything it admits is missing has been
-built, and what remains is the `out-of-scope` list, which stays out on purpose
-and gives its reasons there. If one of those should be built, change its status
-in the spec first — this file only schedules what the spec admits is missing.
+**Why now.** The largest single gap and the cheapest: every one of these
+settings already exists and is already honoured, but only the MODE and FORMAT
+screens can reach them. On the device they are also instructions, which is how
+programs use them — a program that wants a polar graph says `Polar`, it does
+not ask the user to go and set it. Thirty commands for one table and two entry
+points.
+
+| Spec row | What it takes | Size |
+| --- | --- | --- |
+| Mode settings as instructions | A table of name to mode patch, read by both the interpreter and the home screen. `Fix n` takes an argument; the rest are bare words. Four settings do not exist yet and have to be added: the axes, the expression during trace, the coordinate format, and Depend. | M |
+| `Depend: Ask` | The dependent columns wait rather than filling themselves in. Ask mode already exists for the independent one, so this is the same shape. | S |
+
+## Sprint 12 — Graph and table instructions
+
+**Why now.** The other half of what makes a program able to drive the device
+rather than only compute. Everything here already exists behind a keypress;
+this gives it a name.
+
+| Spec row | What it takes | Size |
+| --- | --- | --- |
+| Graph and table instructions | `DispGraph`, `DispTable`, `ClrTable`, `FnOn`, `FnOff`, `GraphStyle(`, `Select(`, `ZoomStat`, `ZPrevious`, `PlotsOn`, `Pt-Change(`. Each maps onto something the store already does; `ZoomStat` needs a window fitted to the stat lists, and `ZPrevious` one more slot beside ZoomSto. | M |
+
+## Sprint 13 — Strings
+
+**Why now.** The one architectural piece left. TI-BASIC leans on strings
+heavily and the value type does not exist, so this is the sprint that changes
+the engine rather than adding to it — worth doing while the test suite is
+thick enough to catch what it disturbs.
+
+| Spec row | What it takes | Size |
+| --- | --- | --- |
+| Strings | A string in `Val`, which `map1`/`map2` must refuse rather than map over, ten string variables, and `expr(`, `sub(`, `length(`, `inString(`, `Equ▸String(`, `String▸Equ(`. `expr(` evaluates its own argument, so the engine ends up able to call itself. | L |
+
+## Sprint 14 — The clock
+
+**Why now.** Refusing it was wrong: a browser has a clock. Twelve commands,
+all of them thin over `Date`, and they make the date and time formats on the
+MODE screen mean something.
+
+| Spec row | What it takes | Size |
+| --- | --- | --- |
+| The clock | `ClockOn`, `ClockOff`, `getTmStr(`, `getDtStr(`, `setTime(`, `setDate(`, `setTmFmt(`, `setDtFmt(`, `dayOfWk(`, `timeCnv(`, `startTmr`, `checkTmr(`. The device keeps its own offset from the host clock so setting the time means something. | M |
+
+## Sprint 15 — Row operations
+
+**Why now.** Four functions, pure arithmetic on a matrix, and the last of the
+MATRX MATH menu. Small enough to finish the list on.
+
+| Spec row | What it takes | Size |
+| --- | --- | --- |
+| Row operations | `rowSwap(`, `row+(`, `*row(`, `*row+(` — exchange, add, scale, and scale-and-add. `matrix.ts` already has the elimination that uses all four internally. | S |
+
+---
 
 ## Not scheduled
 

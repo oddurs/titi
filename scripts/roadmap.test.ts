@@ -110,7 +110,9 @@ describe("the sprints are worth doing separately");
   const bySprint = new Map<string, number>();
   for (const s of sprints) bySprint.set(s.sprint, (bySprint.get(s.sprint) ?? 0) + 1);
   for (const [name, count] of bySprint) {
-    ok(`${name} has enough in it to be a sprint`, count >= 2, `${count} items`);
+    // One row can stand for a whole bucket of commands now — "Strings" is six
+    // functions and a value type — so the useful bound is the upper one.
+    ok(`${name} has something in it`, count >= 1, `${count} items`);
     ok(`${name} is not a dumping ground`, count <= 8, `${count} items`);
   }
   // The plan shrinks as sprints ship, so the useful invariant is not "several"

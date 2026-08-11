@@ -140,7 +140,8 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | `TABLE` | A column per switched-on function | done | `lib/display/screens.ts` |
 | `TBLSET` | `TblStart`, `ΔTbl` | done | `lib/display/screens.ts` |
 | `Indpnt: Ask` | The X column is typed; ENTER adds a row, DEL takes one back | done | `scripts/store.test.ts` |
-| `Depend: Ask` | Deferring the *dependent* column buys nothing here — it is computed instantly | out-of-scope | — |
+| `Depend: Ask` | The Y columns wait to be asked for, rather than filling themselves in | todo | — |
+| Graph and table instructions | `DispGraph`, `DispTable`, `ClrTable`, `FnOn`, `FnOff`, `GraphStyle(`, `Select(`, `ZoomStat`, `ZPrevious`, `PlotsOn`, `Pt-Change(` | todo | — |
 
 ## Statistics
 
@@ -189,6 +190,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | `rref(` `ref(` | — | done | `lib/math/matrix.ts` |
 | `Matr▸list(` `List▸matr(` | — | done | `lib/math/matrix.ts` |
 | Matrix arithmetic | Real product for `×`; inverse via `⁻¹`; division by a matrix is a data-type error | done | `scripts/matrix.test.ts` |
+| Row operations | `row+(`, `rowSwap(`, `*row(`, `*row+(` — the elementary ones | todo | — |
 | Complex entries | Complex stays out of lists and matrices, on purpose | out-of-scope | `lib/math/complex.ts` |
 
 ## Complex numbers
@@ -222,11 +224,13 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | `IS>(` `DS<(` | Count, then skip the next line past the bound | done | `lib/math/program.ts` |
 | `Input` into a graph screen | A bare `Input` hands over the graph and stores the cursor in X and Y | done | `lib/calc/programs.ts` |
 | `Asm(` | There is no Z80 here | out-of-scope | — |
+| Strings | A string value in the engine, with `expr(`, `sub(`, `length(`, `inString(`, `Equ▸String(` and `String▸Equ(` | todo | — |
 
 ## MODE
 
 | Item | Behaviour | Status | Where |
 | --- | --- | --- | --- |
+| Mode settings as instructions | `Func`, `Radian`, `Fix 2`, `AxesOff` and the rest, typed on the home screen or used in a program — the settings all exist, but only the MODE screen can reach them | todo | `lib/calc/layout.ts` |
 | Normal / Sci / Eng | — | done | `lib/math/format.ts` |
 | Float / Fix 0–9 | — | done | `lib/math/format.ts` |
 | Radian / Degree | — | done | `lib/calc/layout.ts` |
@@ -243,6 +247,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | --- | --- | --- | --- |
 | `ClrAllLists` `ClrHome` | — | done | `lib/calc/menus.ts` |
 | `Reset RAM` | Back to a powered-on device | done | `lib/calc/store.ts` |
+| The clock | `ClockOn`, `getTmStr(`, `setDate(`, `dayOfWk(`, `timeCnv(` and the rest — a browser does have a clock, which is why this is not refused | todo | — |
 | `Mem Mgmt` | Lists what is stored and deletes one at a time, staying open for the next | done | `lib/calc/store.ts` |
 
 ## APPS

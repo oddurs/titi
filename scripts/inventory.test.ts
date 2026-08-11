@@ -36,6 +36,9 @@ because("the time-value-of-money solver is out of scope, per CLAUDE.md", [
   "bal(", "dbd(", "irr(", "npv(", "Pmt_Bgn", "Pmt_End", "ΣInt(", "ΣPrn(",
 ]);
 because("one panel, so there is nothing to split", ["Full", "G-T", "Horiz"]);
+because("curves are drawn in one pass, so there is nothing to interleave", [
+  "Sequential", "Simul",
+]);
 because("the panel is addressed in graph units, not pixels", [
   "Pxl-Change(", "Pxl-Off(", "Pxl-On(", "pxl-Test(",
 ]);
@@ -54,7 +57,6 @@ planned("mode and format settings, as instructions a program can use", [
   "DependAuto", "Dot", "Eng", "ExprOff", "ExprOn", "Fix", "Float", "Func",
   "GridOff", "GridOn", "IndpntAsk", "IndpntAuto", "LabelOff", "LabelOn",
   "Normal", "Param", "Polar", "PolarGC", "Real", "RectGC", "Sci", "Seq",
-  "Sequential", "Simul",
 ]);
 planned("graph and table instructions a program can use", [
   "ClrTable", "DispGraph", "DispTable", "FnOff", "FnOn", "GraphStyle(",

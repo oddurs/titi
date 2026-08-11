@@ -101,6 +101,14 @@ export interface Modes {
   labelAxes: boolean;
   grid: boolean;
   coordsOn: boolean;
+  /** the axes themselves, as opposed to the numbers beside them */
+  axes: boolean;
+  /** the expression shown alongside the coordinates while tracing */
+  exprOn: boolean;
+  /** which pair of numbers the trace reads out */
+  coordFmt: "rect" | "polar";
+  /** whether the table fills its Y columns or waits to be asked */
+  depend: "auto" | "ask";
   /** 0–9, as on the device; 5 is the panel drawn at its own brightness */
   contrast: number;
 }

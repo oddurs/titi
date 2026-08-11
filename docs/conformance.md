@@ -112,7 +112,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | `ZOOM` | ZBox, In, Out, ZDecimal, ZSquare, ZStandard, ZTrig, ZInteger, ZoomFit | done | `lib/calc/graphing.ts` |
 | `TRACE` | Walks a curve, reports the coordinate, switches between curves | done | `lib/calc/graphing.ts` |
 | `CALC` | value and `dy/dx` in every mode; zero, minimum, maximum, intersect and `∫f(x)dx` need a function of x, as they do on the device | done | `lib/calc/graphing.ts` |
-| `FORMAT` | Its own screen: grid, axes, labels, coordinates, connected or dot | done | `lib/calc/layout.ts` |
+| `FORMAT` | Its own screen: grid, axes, labels, coordinates, the traced expression, rectangular or polar readout, connected or dot | done | `lib/calc/layout.ts` |
 | Plot styles | Line, thick, dot | done | `lib/calc/types.ts` |
 | Shading between curves | `Shade(` hatches the region between two typed expressions | done | `lib/display/graph.ts` |
 | `ZoomSto` / `ZoomRcl` | One window put aside and brought back, saved with the rest | done | `lib/calc/graphing.ts` |
@@ -140,7 +140,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | `TABLE` | A column per switched-on function | done | `lib/display/screens.ts` |
 | `TBLSET` | `TblStart`, `ΔTbl` | done | `lib/display/screens.ts` |
 | `Indpnt: Ask` | The X column is typed; ENTER adds a row, DEL takes one back | done | `scripts/store.test.ts` |
-| `Depend: Ask` | The Y columns wait to be asked for, rather than filling themselves in | todo | — |
+| `Depend: Ask` | The Y columns stay empty rather than filling themselves in | done | `lib/display/screens.ts` |
 | Graph and table instructions | `DispGraph`, `DispTable`, `ClrTable`, `FnOn`, `FnOff`, `GraphStyle(`, `Select(`, `ZoomStat`, `ZPrevious`, `PlotsOn`, `Pt-Change(` | todo | — |
 
 ## Statistics
@@ -230,7 +230,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 
 | Item | Behaviour | Status | Where |
 | --- | --- | --- | --- |
-| Mode settings as instructions | `Func`, `Radian`, `Fix 2`, `AxesOff` and the rest, typed on the home screen or used in a program — the settings all exist, but only the MODE screen can reach them | todo | `lib/calc/layout.ts` |
+| Mode settings as instructions | Thirty of them, from one table read by both the home screen and the interpreter; `Fix n` takes a digit | done | `lib/calc/instructions.ts` |
 | Normal / Sci / Eng | — | done | `lib/math/format.ts` |
 | Float / Fix 0–9 | — | done | `lib/math/format.ts` |
 | Radian / Degree | — | done | `lib/calc/layout.ts` |

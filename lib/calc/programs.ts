@@ -1,4 +1,5 @@
 import { Interpreter, type DrawCommand } from "../math/program";
+import { parseModeCommand } from "./instructions";
 import type { Env } from "../math/eval";
 import type { Drawing, MenuState, ScreenId } from "./types";
 import type { CalcState } from "./store";
@@ -64,6 +65,22 @@ function toDrawing(c: DrawCommand): Drawing | null {
   }
 }
 
+/** Apply the mode instructions a program used since the last pump. */
+function drainModes() {
+  if (!vm || !vm.modeChanges.length) return;
+  let modes = { ...get().modes };
+  let tbl = { ...get().tbl };
+  for (const line of vm.modeChanges) {
+    const change = parseModeCommand(line);
+    if (!change) continue;
+    modes = { ...modes, ...change.modes };
+    tbl = { ...tbl, ...change.tbl };
+  }
+  vm.modeChanges.length = 0;
+  set({ modes, tbl });
+  syncEnv({ modes });
+}
+
 /** Apply everything the program drew since the last pump. */
 function drainDraws() {
   if (!vm || !vm.draws.length) return;
@@ -83,6 +100,7 @@ function pumpProgram() {
   if (!vm) return;
   const st = get();
   const status = vm.run();
+  drainModes();
   drainDraws();
   const base = {
     name: st.prgmRun?.name ?? "",
@@ -154,6 +172,8 @@ function startProgram(name: string) {
     { notation: st.modes.notation, decimals: st.modes.decimals },
     (n) => get().programs.find((p) => p.name === n),
   );
+  // lib/math has no idea what a device mode is, so it asks.
+  vm.isModeCommand = (line) => parseModeCommand(line) !== null;
   set({
     screen: "prgmrun",
     menu: null,

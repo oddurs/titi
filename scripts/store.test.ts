@@ -427,9 +427,10 @@ describe("the catalog");
 {
   const d = device().press("2nd catalog").press("S");
   const at = () => d.get().menu!.tabs[0].items[d.get().menu!.index].label;
-  eq("a letter jumps to it", at(), "seq(");
+  // The catalog holds the mode instructions too, so S reaches Sci first.
+  eq("a letter jumps to it", at(), "Sci");
   d.press("S");
-  eq("pressing it again walks the run", at(), "sin(");
+  eq("pressing it again walks the run", at(), "Seq");
   d.press("C");
   eq("and another letter starts its own", at(), "conj(");
 }
@@ -582,6 +583,46 @@ describe("2nd OFF switches it off");
   eq("the program is waiting", d.get().prgmRun?.status, "key");
   d.press("2nd off");
   eq("switching off stops it", d.get().powered, false);
+}
+
+describe("the settings are instructions too");
+{
+  const say = (line: string) => {
+    const d = device();
+    d.get().typeText(line);
+    d.press("enter");
+    return d;
+  };
+  eq("Polar sets the graph mode", say("Polar").get().modes.graphMode, "pol");
+  eq("Degree sets the angle", say("Degree").get().modes.angle, "deg");
+  eq("Sci sets the notation", say("Sci").get().modes.notation, "sci");
+  eq("Fix takes a digit", say("Fix 3").get().modes.decimals, 3);
+  eq("Float takes it back", say("Fix 3").get().modes.decimals, 3);
+  eq("AxesOff clears the axes", say("AxesOff").get().modes.axes, false);
+  eq("PolarGC changes the readout", say("PolarGC").get().modes.coordFmt, "polar");
+  eq("IndpntAsk reaches the table setup", say("IndpntAsk").get().tbl.auto, false);
+  eq("DependAsk too", say("DependAsk").get().modes.depend, "ask");
+  eq("and each answers Done", say("Radian").tape(), ["Radian = Done"]);
+}
+{
+  // They have to be instructions, not variables multiplied together.
+  const d = device();
+  d.get().typeText("Func");
+  d.press("enter");
+  eq("Func is a command, not F×u×n×c", d.get().history[0].output, "Done");
+  eq("and it set the mode", d.get().modes.graphMode, "func");
+}
+{
+  // A program uses them the same way, which is the point of the exercise.
+  const d = device();
+  d.get().typeText("");
+  const store = d.get();
+  store.programs.push({ name: "SETUP", body: "Degree\nPolar\nAxesOff\nDisp 1" });
+  d.press("prgm").choose("SETUP");
+  eq("a program sets the angle", d.get().modes.angle, "deg");
+  eq("and the graph mode", d.get().modes.graphMode, "pol");
+  eq("and the format", d.get().modes.axes, false);
+  eq("while still running its own lines", d.get().prgmRun?.output, ["1"]);
 }
 
 reportIfMain(import.meta.url);

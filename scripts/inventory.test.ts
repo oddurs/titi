@@ -52,12 +52,6 @@ const planned = (why: string, names: string[]) => {
   for (const n of names) TODO[n] = why;
 };
 
-planned("mode and format settings, as instructions a program can use", [
-  "AxesOff", "AxesOn", "Connected", "CoordOff", "CoordOn", "DependAsk",
-  "DependAuto", "Dot", "Eng", "ExprOff", "ExprOn", "Fix", "Float", "Func",
-  "GridOff", "GridOn", "IndpntAsk", "IndpntAuto", "LabelOff", "LabelOn",
-  "Normal", "Param", "Polar", "PolarGC", "Real", "RectGC", "Sci", "Seq",
-]);
 planned("graph and table instructions a program can use", [
   "ClrTable", "DispGraph", "DispTable", "FnOff", "FnOn", "GraphStyle(",
   "Select(", "ZoomStat", "ZPrevious", "PlotsOn", "Pt-Change(",

@@ -120,6 +120,38 @@ export const ALL_MODE_ROWS: ModeOption[] = [
       { value: false, label: "Coords off" },
     ],
   },
+  {
+    key: "axes",
+    hint: "the axes themselves",
+    choices: [
+      { value: true, label: "Axes on" },
+      { value: false, label: "Axes off" },
+    ],
+  },
+  {
+    key: "exprOn",
+    hint: "name the function while tracing",
+    choices: [
+      { value: true, label: "Expr on" },
+      { value: false, label: "Expr off" },
+    ],
+  },
+  {
+    key: "coordFmt",
+    hint: "which pair the trace reads out",
+    choices: [
+      { value: "rect", label: "RectGC" },
+      { value: "polar", label: "PolarGC" },
+    ],
+  },
+  {
+    key: "depend",
+    hint: "does the table fill its Y columns",
+    choices: [
+      { value: "auto", label: "Depend Auto" },
+      { value: "ask", label: "Depend Ask" },
+    ],
+  },
 ];
 
 /** One editable row per line of the solver screen. */
@@ -160,7 +192,10 @@ export function solverRows(s: SolverState): SolverRow[] {
  * the slots mean, FORMAT is what the graph looks like. They share one row
  * description because they are edited identically.
  */
-const FORMAT_KEYS = ["grid", "labelAxes", "coordsOn", "connected"] as const;
+const FORMAT_KEYS = [
+  "grid", "axes", "labelAxes", "coordsOn", "exprOn", "coordFmt", "connected",
+  "depend",
+] as const;
 
 export const MODE_ROWS = ALL_MODE_ROWS.filter(
   (r) => !FORMAT_KEYS.includes(r.key as (typeof FORMAT_KEYS)[number]),

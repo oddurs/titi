@@ -28,22 +28,9 @@ day with tests, `L` needs a design decision first.
 | 8 | Programs that react — getKey, a placed Output(, IS>( and DS<(, and Input on the graph | `2516be5` |
 | 9 | The graph's last controls — a FORMAT screen, ZoomSto and ZoomRcl, DrawF, DrawInv, Shade(, and CALC in every mode | `997cf6b` |
 | 10 | Editing, memory and the engine's leftovers — error Goto, a real RCL, Mem Mgmt, the logic connectives, remainder(, the CPX tab | `63835b9` |
+| 11 | Modes as instructions — thirty settings given names, plus the axes, the traced expression, the coordinate format and Depend | pending |
 
 ---
-
-## Sprint 11 — Modes as instructions
-
-**Why now.** The largest single gap and the cheapest: every one of these
-settings already exists and is already honoured, but only the MODE and FORMAT
-screens can reach them. On the device they are also instructions, which is how
-programs use them — a program that wants a polar graph says `Polar`, it does
-not ask the user to go and set it. Thirty commands for one table and two entry
-points.
-
-| Spec row | What it takes | Size |
-| --- | --- | --- |
-| Mode settings as instructions | A table of name to mode patch, read by both the interpreter and the home screen. `Fix n` takes an argument; the rest are bare words. Four settings do not exist yet and have to be added: the axes, the expression during trace, the coordinate format, and Depend. | M |
-| `Depend: Ask` | The dependent columns wait rather than filling themselves in. Ask mode already exists for the independent one, so this is the same shape. | S |
 
 ## Sprint 12 — Graph and table instructions
 

@@ -1,4 +1,5 @@
 import { FUNCTIONS } from "../math/lexer";
+import { MODE_COMMAND_NAMES } from "./instructions";
 import type { MenuItem, MenuTab } from "./types";
 
 const ins = (label: string, insert: string, hint?: string) => ({ label, insert, hint });
@@ -22,7 +23,8 @@ function catalogItems(): MenuItem[] {
     "seq(": "expr, var, from, to, step",
     "rref(": "reduced row echelon",
   };
-  const extras = ["π", "ℯ", "Ans", "rand", "θ", "∞"];
+  // The mode instructions are commands too, and the device lists them here.
+  const extras = ["π", "ℯ", "Ans", "rand", "θ", "∞", ...MODE_COMMAND_NAMES];
   const key = (label: string) => {
     const first = label[0];
     const isLetter = /[A-Za-z]/.test(first);

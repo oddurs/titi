@@ -33,6 +33,10 @@ export const DEFAULT_MODES: Modes = {
   labelAxes: true,
   grid: true,
   coordsOn: true,
+  axes: true,
+  exprOn: true,
+  coordFmt: "rect",
+  depend: "auto",
   contrast: 5,
 };
 

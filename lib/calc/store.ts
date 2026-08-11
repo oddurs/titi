@@ -7,6 +7,7 @@ import { isMatrix } from "../math/matrix";
 import { nextBoundary, prevBoundary } from "../math/lexer";
 import { keyById, keyCode } from "./keys";
 import { ParseError } from "../math/ast";
+import { parseModeCommand, MODE_COMMAND_NAMES } from "./instructions";
 import { MENUS } from "./menus";
 import type { StatReport } from "../math/stats";
 import { createReports } from "./reports";
@@ -266,6 +267,26 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
   function commitHome() {
     const src = get().entry.text.trim();
     if (!src) return;
+
+    // A mode instruction is the whole line: it sets something and answers
+    // Done, the way the device does, rather than being parsed as maths.
+    const change = parseModeCommand(src);
+    if (change) {
+      const now = get();
+      applyModes({ ...now.modes, ...change.modes });
+      if (change.tbl) set({ tbl: { ...get().tbl, ...change.tbl } });
+      set({
+        history: [
+          ...get().history,
+          { id: get().history.length + 1, input: src, output: "Done", isError: false },
+        ].slice(-80),
+        entry: { text: "", caret: 0 },
+        entryIndex: -1,
+      });
+      persist();
+      return;
+    }
+
     const { ok, text, at } = evalEntry();
     const value = env.ans;
     const item: HistoryItem = {

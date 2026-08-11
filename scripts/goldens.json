@@ -227,13 +227,17 @@
     ]
   },
   "format": {
-    "digest": "bba51844",
+    "digest": "a4191439",
     "transcript": [
       "FORMAT RAD",
       "Connected Dot <",
       "Grid on Grid off",
       "Labels on Labels off",
-      "Coords on Coords off"
+      "Coords on Coords off",
+      "Axes on Axes off",
+      "Expr on Expr off",
+      "RectGC PolarGC",
+      "Depend Auto Depend Ask"
     ]
   },
   "graph-drawn-curve": {

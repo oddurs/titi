@@ -365,6 +365,37 @@ describe("a program's drawings reach the graph");
   ok("and labels it", drawings.some((x) => x.kind === "text" && x.label === "TARGET"));
 }
 
+describe("the new format settings change the panel");
+{
+  const graph = () => device().press("y=").press("X,T,θ,n").press("x²").press("enter").press("graph");
+  const withAxes = renderPanel(graph().get());
+  const noAxes = renderPanel(graph().press("2nd format").repeat("down", 1).press("right").press("graph").get());
+  ok("AxesOff removes a great many dots", noAxes.count() < withAxes.count() - 100,
+    `${withAxes.count()} then ${noAxes.count()}`);
+}
+{
+  const traced = () => device().press("y=").press("X,T,θ,n").press("x²").press("enter")
+    .press("graph").press("trace").repeat("right", 6);
+  const rect = renderPanel(traced().get());
+  ok("the trace reads out X and Y", shows(rect, "X=") && shows(rect, "Y="));
+
+  // The instruction has to be typed on the home screen, not into a Y= slot.
+  const polar = device().press("y=").press("X,T,θ,n").press("x²").press("enter").press("2nd quit");
+  polar.get().typeText("PolarGC");
+  polar.press("enter").press("graph").press("trace").repeat("right", 6);
+  const p = renderPanel(polar.get());
+  ok("PolarGC reads out R and θ instead", shows(p, "R=") && shows(p, "θ="));
+  ok("and no longer X and Y", !shows(p, "X="));
+}
+{
+  const named = device().press("y=").press("X,T,θ,n").press("enter").press("graph").press("trace");
+  ok("the trace names the function", shows(renderPanel(named.get()), "Y₁"));
+  const bare = device().press("y=").press("X,T,θ,n").press("enter").press("2nd quit");
+  bare.get().typeText("ExprOff");
+  bare.press("enter").press("graph").press("trace");
+  ok("ExprOff drops the name", !shows(renderPanel(bare.get()), "Y₁"));
+}
+
 describe("contrast");
 {
   near("5 leaves the panel exactly as drawn", inkGain(5), 1.05);

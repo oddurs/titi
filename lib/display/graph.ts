@@ -116,17 +116,19 @@ export function renderGraph(pen: Pen, g: GraphInput) {
   const ax = Math.round(Math.min(Math.max(px(0), 0), w - 1));
   const ay = Math.round(Math.min(Math.max(py(0), top), top + h - 1));
 
-  pen.hline(0, w - 1, ay, AXIS_INK);
-  pen.vline(ax, top, top + h - 1, AXIS_INK);
+  if (g.modes.axes) {
+    pen.hline(0, w - 1, ay, AXIS_INK);
+    pen.vline(ax, top, top + h - 1, AXIS_INK);
 
-  // tick marks along each axis
-  for (let i = Math.ceil(win.xmin / stepX); i * stepX <= win.xmax; i++) {
-    const x = Math.round(px(i * stepX));
-    pen.vline(x, ay - 1, ay + 1, AXIS_INK);
-  }
-  for (let i = Math.ceil(win.ymin / stepY); i * stepY <= win.ymax; i++) {
-    const y = Math.round(py(i * stepY));
-    pen.hline(ax - 1, ax + 1, y, AXIS_INK);
+    // tick marks along each axis
+    for (let i = Math.ceil(win.xmin / stepX); i * stepX <= win.xmax; i++) {
+      const x = Math.round(px(i * stepX));
+      pen.vline(x, ay - 1, ay + 1, AXIS_INK);
+    }
+    for (let i = Math.ceil(win.ymin / stepY); i * stepY <= win.ymax; i++) {
+      const y = Math.round(py(i * stepY));
+      pen.hline(ax - 1, ax + 1, y, AXIS_INK);
+    }
   }
 
   // -- stat plots -----------------------------------------------------------
@@ -482,11 +484,20 @@ export function graphReadout(g: GraphInput): string[] | null {
   if (!c) return null;
   const p = c.at(g.trace.x);
   const finite = Number.isFinite(p.x) && Number.isFinite(p.y);
-  const out = [c.label];
+  const out = g.modes.exprOn ? [c.label] : [];
   if (!c.isFunction) {
     const label =
       g.modes.graphMode === "pol" ? "θ" : g.modes.graphMode === "seq" ? "n" : "T";
     out.push(`${label}=${trim(formatNumber(g.trace.x, fmt))}`);
+  }
+  if (g.modes.coordFmt === "polar") {
+    // The same point, said the other way: distance from the origin and angle.
+    const r = Math.hypot(p.x, p.y);
+    const theta = Math.atan2(p.y, p.x);
+    const shown = g.modes.angle === "deg" ? (theta * 180) / Math.PI : theta;
+    out.push(`R=${finite ? trim(formatNumber(r, fmt)) : "-"}`);
+    out.push(`θ=${finite ? trim(formatNumber(shown, fmt)) : "-"}`);
+    return out;
   }
   out.push(`X=${finite ? trim(formatNumber(p.x, fmt)) : "-"}`);
   out.push(`Y=${finite ? trim(formatNumber(p.y, fmt)) : "-"}`);

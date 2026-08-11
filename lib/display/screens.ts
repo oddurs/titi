@@ -365,6 +365,13 @@ function renderTable(pen: Pen, s: CalcState, top: number) {
     }
     const x = asked ? asked[s.row + r] : s.tbl.start + (s.row + r) * s.tbl.step;
     pen.text(0, row, pen.clip(formatNumber(x, fmt), colWidth - 1), INK.dim);
+    // Depend: Ask leaves the dependent columns blank until they are wanted.
+    if (s.modes.depend === "ask") {
+      for (let c = 0; c < cols; c++) {
+        pen.text((c + 1) * colWidth, row, "-", INK.dim);
+      }
+      continue;
+    }
     for (let c = 0; c < cols; c++) {
       let v = "-";
       try {

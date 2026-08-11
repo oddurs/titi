@@ -29,6 +29,11 @@ export type Status =
  * and must not know about the device, so it emits coordinates and lets the
  * store turn them into something the graph can draw.
  */
+/** A mode instruction a program used; the caller applies it. */
+export interface ModeCommand {
+  line: string;
+}
+
 export interface DrawCommand {
   cmd: "line" | "hline" | "vline" | "circle" | "point" | "text" | "clear";
   args: number[];
@@ -149,6 +154,11 @@ export class Interpreter {
   /** what the program has asked to be drawn, for the caller to drain */
   readonly draws: DrawCommand[] = [];
   /**
+   * Mode instructions the program used. lib/math must not know what a device
+   * mode is, so the line is handed out and the caller decides what it means.
+   */
+  readonly modeChanges: string[] = [];
+  /**
    * Text put somewhere specific by Output(, as opposed to Disp's scroll.
    * The device has one screen and both write to it, so they are kept apart
    * here and laid over one another when drawn.
@@ -169,6 +179,9 @@ export class Interpreter {
   ) {
     this.stack.push(parseProgram(entry.name, entry.body));
   }
+
+  /** Set by the caller: which lines are mode instructions rather than maths. */
+  isModeCommand: (line: string) => boolean = () => false;
 
   /** Store where the cursor was left, for a bare Input. */
   providePoint(x: number, y: number) {
@@ -258,6 +271,14 @@ export class Interpreter {
 
   /** Returns a Status when the program needs to suspend, otherwise undefined. */
   private exec(f: Frame, line: string): Status | undefined {
+    // A mode instruction is the whole line and means nothing to the maths, so
+    // it is recorded for the caller before anything tries to evaluate it.
+    if (this.isModeCommand(line.trim())) {
+      this.modeChanges.push(line.trim());
+      f.pc += 1;
+      return;
+    }
+
     const kw = keyword(line);
 
     switch (kw) {

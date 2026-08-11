@@ -260,13 +260,17 @@ export default function Screen() {
             ref={canvasRef}
             className="panel"
             role="img"
-            aria-label={`Calculator display: ${transcript.join(". ")}`}
+            aria-label={
+              state.powered
+                ? `Calculator display: ${transcript.join(". ")}`
+                : "Calculator display: off"
+            }
           />
         </div>
         {/* The panel is a canvas, so its contents are mirrored here for
             assistive technology. */}
         <div className="sr-only" role="status" aria-live="polite">
-          {transcript.join(". ")}
+          {state.powered ? transcript.join(". ") : "Calculator off. Press ON."}
         </div>
       </div>
     </div>

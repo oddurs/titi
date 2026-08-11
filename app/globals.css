@@ -47,6 +47,11 @@
   --cap: #dbd7ce;
   --cap-lo: #bab6ac;
   --cap-ink: #14161a;
+  /* Blue and green again, mixed for a cream keycap rather than a dark one.
+     The bright pair is unreadable on the light caps, and a modifier label you
+     cannot read is the one thing this state exists to show. */
+  --cap-blue: #12508f;
+  --cap-green: #0e6045;
 
   --text: #e9ebef;
   --muted: #858c98;
@@ -586,6 +591,22 @@ button {
   text-shadow: none;
 }
 
+/* Promoted onto a cream cap, the modifier ink has to change with it. */
+.keypad[data-mod="2nd"] .key[data-role="digit"] .key-2nd,
+.keypad[data-mod="2nd"] .key[data-role="enter"] .key-2nd {
+  color: var(--cap-blue);
+}
+
+.keypad[data-mod="alpha"] .key[data-role="digit"] .key-alpha,
+.keypad[data-mod="alpha"] .key[data-role="enter"] .key-alpha,
+.keypad[data-mod="alpha-lock"] .key[data-role="digit"] .key-alpha,
+.keypad[data-mod="alpha-lock"] .key[data-role="enter"] .key-alpha {
+  color: var(--cap-green);
+}
+
+/* Demoted, the face label leaves the cap and lands on the dark plate — so it
+   takes the plate's ink rather than keeping the keycap's, which on a cream cap
+   was dark-on-dark and all but invisible. */
 .keypad[data-mod="2nd"] .key:has(.key-2nd) .key-face,
 .keypad[data-mod="alpha"] .key:has(.key-alpha) .key-face,
 .keypad[data-mod="alpha-lock"] .key:has(.key-alpha) .key-face {
@@ -593,7 +614,9 @@ button {
   left: 3px;
   transform: none;
   font-size: clamp(8px, 1.05vmin, 10px);
-  opacity: 0.3;
+  color: var(--muted);
+  opacity: 0.55;
+  text-shadow: none;
 }
 
 .keypad[data-mod="2nd"] .key:has(.key-2nd) .key-alpha,
@@ -672,13 +695,32 @@ button {
 
 /* --- dot-matrix panel ----------------------------------------------------- */
 
+/* The active area of a real panel stops short of the glass: there is a border
+   of dead, unlit substrate around it. Without that margin the dots run into
+   the bezel and the whole thing reads as a texture rather than a component.
+   The wrapper's padding is what the ResizeObserver measures, so the dot grid
+   simply gets a smaller box and nothing else has to know. */
 .panel-wrap {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
+  padding: clamp(7px, 1.15vmin, 14px);
   touch-action: none;
   overflow: hidden;
+}
+
+/* Where the active matrix meets the dead border — the faintest possible seam,
+   the way the edge of an LCD's aperture catches light. */
+.panel-wrap::after {
+  content: "";
+  position: absolute;
+  inset: clamp(4px, 0.75vmin, 9px);
+  border-radius: 3px;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 0 0 2px rgba(122, 178, 236, 0.045);
 }
 
 .panel {

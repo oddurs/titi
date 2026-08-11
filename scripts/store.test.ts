@@ -550,4 +550,38 @@ describe("memory management");
   eq("a matrix can go too", Object.keys(d.get().mats).length, 0);
 }
 
+describe("2nd OFF switches it off");
+{
+  const d = device().type("7/8").press("enter").press("2nd off");
+  eq("it is off", d.get().powered, false);
+  eq("nothing is lit", renderPanel(d.get()).count(), 0);
+  eq("and the panel says so", renderPanel(d.get()).transcript, []);
+}
+{
+  const d = device().type("7/8").press("enter").press("2nd off");
+  d.press("7").press("graph").press("math").press("2nd").press("enter");
+  eq("the keypad has stopped answering", d.get().screen, "home");
+  eq("nothing was typed", d.get().entry.text, "");
+  eq("no menu opened", d.get().menu, null);
+  eq("and the modifier stayed put", d.get().mod, "none");
+}
+{
+  const d = device().type("7/8").press("enter").press("2nd off").press("on");
+  eq("ON wakes it", d.get().powered, true);
+  eq("with the tape still there", d.tape(), ["7÷8 = .875"]);
+  ok("and something on screen", renderPanel(d.get()).count() > 100);
+}
+{
+  // Clearing the RAM leaves it switched on, not switched off.
+  const d = device().press("2nd off").press("on").press("on");
+  eq("a reset comes back on", d.get().powered, true);
+}
+{
+  // A program cannot keep running into a dark screen.
+  const d = device().press("prgm").choose("KEYPAD");
+  eq("the program is waiting", d.get().prgmRun?.status, "key");
+  d.press("2nd off");
+  eq("switching off stops it", d.get().powered, false);
+}
+
 reportIfMain(import.meta.url);

@@ -287,6 +287,18 @@ Material rules: one light source above and slightly left; every surface declares
 its plane (stage < shell < plate < key; shell > well > screen). Blue and green
 are reserved for `2ND` and `ALPHA` state and must not be used decoratively.
 
+**A label changes colour with the surface it lands on.** Arming a modifier
+promotes its label onto the keycap and demotes the face label onto the plate —
+so the bright blue and green need `--cap-blue` / `--cap-green` on the cream
+caps (they were 1.5:1 there), and the demoted face has to take the plate's ink
+rather than the cap's (which was 1.03:1, invisible). Anything that moves
+between the plate and a keycap has to be checked on both.
+
+**The active area stops short of the glass.** `.panel-wrap` carries padding, so
+the dot field has the dead border a real panel has; the ResizeObserver measures
+the padded box, so the grid simply gets a smaller box and nothing else needs to
+know.
+
 The screen is an edge-lit panel: `.screen` stays dark and even, and the lamp is
 a short falloff on `.screen-body::before`. Do not put a large glow on `.screen`
 itself — it fogs the whole field.

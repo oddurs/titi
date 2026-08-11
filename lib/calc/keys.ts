@@ -99,7 +99,7 @@ export const KEY_ROWS: (KeyDef | null)[][] = [
     { id: "add", label: "+", second: "mem", alpha: '"', role: "op", ins: "+", act2: "menu:mem" },
   ],
   [
-    { id: "on", label: "on", second: "off", role: "control", act: "reset" },
+    { id: "on", label: "on", second: "off", role: "control", act: "reset", act2: "power" },
     { id: "d0", label: "0", second: "catalog", alpha: "␣", role: "digit", ins: "0", act2: "menu:catalog" },
     { id: "dot", label: ".", second: "i", alpha: ":", role: "digit", ins: ".", ins2: "i" },
     { id: "neg", label: "(−)", second: "ans", alpha: "?", role: "digit", ins: "-", ins2: "Ans" },

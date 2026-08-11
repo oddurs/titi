@@ -47,7 +47,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | Keypad focus | One tab stop; arrows move between keys, Enter or Space presses one | done | `lib/calc/keys.ts` |
 | `2ND ▲` / `2ND ▼` | Contrast, 0–9, remembered | done | `lib/display/panel.ts` |
 | `ON` | Clears RAM and returns to the home screen | done | `lib/calc/store.ts` |
-| `2ND OFF` | Powering off has no meaning in a browser tab | out-of-scope | — |
+| `2ND OFF` | The panel goes dark and the keypad stops answering until `ON`; not saved, so a reload hands back a working calculator | done | `scripts/store.test.ts` |
 | `2ND LINK` | There is no second device to link to | out-of-scope | — |
 
 ## The home screen

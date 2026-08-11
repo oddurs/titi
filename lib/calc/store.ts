@@ -125,6 +125,12 @@ export interface CalcState {
    * device.
    */
   onEquals: boolean;
+  /**
+   * Off is a real state, not a metaphor: the panel goes dark and the keypad
+   * stops answering. Deliberately not saved — a reload should hand back a
+   * working calculator, not one somebody left switched off.
+   */
+  powered: boolean;
   /** the line that failed, so Goto can bring it back */
   errorSrc: string;
   /** a window put aside by ZoomSto, for ZoomRcl to bring back */
@@ -869,6 +875,22 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         return;
       }
 
+      case "power":
+        // 2nd OFF. The screen clears rather than freezing, so switching back
+        // on looks like waking rather than un-pausing.
+        stopProgram();
+        set({
+          powered: false,
+          menu: null,
+          mod: "none",
+          message: null,
+          graphPrompt: null,
+          entry: { text: "", caret: 0 },
+          target: { kind: "home" },
+          screen: "home",
+        });
+        return;
+
       case "contrast": {
         const contrast = clamp(st.modes.contrast + (arg === "up" ? 1 : -1), 0, 9);
         if (contrast === st.modes.contrast) return note(`Contrast ${contrast}`);
@@ -1332,6 +1354,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         stopProgram();
         set({
           screen: "home",
+          powered: true,
           history: [],
           entry: { text: "", caret: 0 },
           entryIndex: -1,
@@ -1384,6 +1407,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     modes: { ...DEFAULT_MODES },
     menu: null,
     trace: null,
+    powered: true,
     errorSrc: "",
     savedWin: null,
     marks: [],
@@ -1419,13 +1443,29 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       if (!key) return;
       const st = get();
 
-      // A program watching the keyboard gets the key instead of the device —
-      // except ON, which is how you get out of a program that never stops.
-      if (st.prgmRun?.status === "key" && id !== "on" && offerKey(keyCode(id))) {
+      // Off, only ON is listened to — the rest of the faceplate is asleep.
+      if (!st.powered) {
+        if (id === "on") set({ powered: true, mod: "none", message: null });
+        return;
+      }
+
+      // 2nd OFF is a hardware function: it outranks whatever is running,
+      // including a program that has been handed the keyboard.
+      if (st.mod === "2nd" && id === "on") {
+        runAction("power");
         return;
       }
 
       const isModKey = key.role === "mod2nd" || key.role === "modalpha";
+
+      // A program watching the keyboard gets the key instead of the device —
+      // except ON, which is how you get out of a program that never stops.
+      // A modifier is handed over *and* still arms, so 2nd OFF can be formed
+      // while a program is running; otherwise the chord could never happen.
+      if (st.prgmRun?.status === "key" && id !== "on") {
+        const taken = offerKey(keyCode(id));
+        if (taken && !isModKey) return;
+      }
       // ENTER ends A-lock and acts as ENTER — it does not type its own alpha
       // label. Reading st.mod after the reset would have missed that.
       const releasesLock = !isModKey && st.mod === "alpha-lock" && key.role === "enter";

@@ -96,6 +96,9 @@ export function renderFailure(pen: Pen, message: string): void {
 
 export function renderScreen(pen: Pen, s: CalcState): HitRegion[] {
   const hits: HitRegion[] = [];
+  // Switched off: nothing is lit. The unlit dot field is physical and stays,
+  // which is exactly what a dark LCD looks like.
+  if (!s.powered) return hits;
   const top = chrome(pen, s);
 
   switch (s.screen) {

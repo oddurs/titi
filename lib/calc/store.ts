@@ -112,6 +112,8 @@ export interface CalcState {
   plots: StatPlot[];
   /** the list weighting L₁ in STAT CALC, or null for one count each */
   statFreq: string | null;
+  /** Str0..Str9, kept beside the env copy the engine writes into */
+  strs: Record<string, string>;
   lists: number[][];
   mats: Record<string, Matrix>;
   programs: ProgramSource[];
@@ -192,6 +194,9 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       st.lists.map((l, i) => [LIST_NAMES[i], l]),
     );
     env.mats = st.mats;
+    // The engine writes into env.strs directly, so state follows it rather
+    // than the other way round — the same deal the matrices have.
+    if (s.strs) env.strs = { ...s.strs };
     clearYCache();
   }
 
@@ -323,6 +328,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     };
     set({
       history: [...get().history, item].slice(-80),
+      strs: { ...env.strs },
       entry: { text: "", caret: 0 },
       // The next ENTRY starts from the top again.
       entryIndex: -1,
@@ -369,6 +375,34 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
    */
   function runDeviceCommand(name: string, rawArgs: string[]): boolean {
     const st = get();
+
+    // These two copy text between a Y= slot and a string variable, so their
+    // arguments are names rather than expressions and must not be evaluated.
+    if (name === "Equ▸String(" || name === "String▸Equ(") {
+      const [from, to] = rawArgs.map((a) => a.trim());
+      const slotOf = (n: string) => st.ys.findIndex((y) => y.name === n);
+      if (name === "Equ▸String(") {
+        const slot = slotOf(from);
+        if (slot < 0 || !/^Str\d$/.test(to)) {
+          note("ERR: SYNTAX");
+          return true;
+        }
+        env.strs[to] = st.ys[slot].expr;
+        set({ revision: st.revision + 1 });
+        return true;
+      }
+      const slot = slotOf(to);
+      if (slot < 0 || !/^Str\d$/.test(from)) {
+        note("ERR: SYNTAX");
+        return true;
+      }
+      const ys = st.ys.map((y, i) => (i === slot ? { ...y, expr: env.strs[from] ?? "" } : y));
+      set({ ys, revision: st.revision + 1 });
+      syncEnv({ ys });
+      persist();
+      return true;
+    }
+
     let args: number[];
     try {
       args = rawArgs.map((a) => {
@@ -1601,6 +1635,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     drawings: [],
     plots: freshPlots(),
     statFreq: null,
+    strs: {},
     lists: Array.from({ length: 6 }, () => [] as number[]),
     mats: { "[A]": MX.identity(2) },
     programs: SAMPLE_PROGRAMS.map((p) => ({ ...p })),

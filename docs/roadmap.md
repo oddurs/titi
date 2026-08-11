@@ -29,20 +29,10 @@ day with tests, `L` needs a design decision first.
 | 9 | The graph's last controls — a FORMAT screen, ZoomSto and ZoomRcl, DrawF, DrawInv, Shade(, and CALC in every mode | `997cf6b` |
 | 10 | Editing, memory and the engine's leftovers — error Goto, a real RCL, Mem Mgmt, the logic connectives, remainder(, the CPX tab | `63835b9` |
 | 11 | Modes as instructions — thirty settings given names, plus the axes, the traced expression, the coordinate format and Depend | `750fc25` |
-| 12 | Graph and table instructions — ten of them, and a window that remembers what it was | pending |
+| 12 | Graph and table instructions — ten of them, and a window that remembers what it was | `ea4d696` |
+| 13 | Strings — a string in the value type, ten variables, and six functions | pending |
 
 ---
-
-## Sprint 13 — Strings
-
-**Why now.** The one architectural piece left. TI-BASIC leans on strings
-heavily and the value type does not exist, so this is the sprint that changes
-the engine rather than adding to it — worth doing while the test suite is
-thick enough to catch what it disturbs.
-
-| Spec row | What it takes | Size |
-| --- | --- | --- |
-| Strings | A string in `Val`, which `map1`/`map2` must refuse rather than map over, ten string variables, and `expr(`, `sub(`, `length(`, `inString(`, `Equ▸String(`, `String▸Equ(`. `expr(` evaluates its own argument, so the engine ends up able to call itself. | L |
 
 ## Sprint 14 — The clock
 

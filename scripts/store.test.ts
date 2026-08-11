@@ -702,4 +702,34 @@ describe("instructions that act on the device");
   eq("and ends up on the graph", d.get().screen, "graph");
 }
 
+describe("equations and strings change places");
+{
+  const say = (d: ReturnType<typeof device>, line: string) => {
+    d.get().typeText(line);
+    d.press("enter");
+    return d;
+  };
+  const d = device().press("y=").press("X,T,θ,n").press("x²").press("enter").press("2nd quit");
+  say(d, "Equ▸String(Y₁,Str1)");
+  eq("the equation becomes text", d.get().env.strs.Str1, "X²");
+  say(d, "String▸Equ(Str1,Y₃)");
+  eq("and text becomes an equation", d.get().ys[2].expr, "X²");
+  say(d, '"2X+1"→Str2');
+  say(d, "String▸Equ(Str2,Y₄)");
+  eq("a typed string can be a function", d.get().ys[3].expr, "2X+1");
+  eq("which the graph can then draw", d.get().ys[3].expr.length > 0, true);
+
+  eq("a slot that does not exist is refused",
+    say(device(), "Equ▸String(Y₉,Str1)").get().message, "ERR: SYNTAX");
+  eq("and so is a string that is not one",
+    say(device(), "Equ▸String(Y₁,Q)").get().message, "ERR: SYNTAX");
+}
+{
+  // Strings survive being put away and brought back.
+  const d = device();
+  d.get().typeText('"KEEP"→Str3');
+  d.press("enter");
+  eq("stored", d.get().strs.Str3, "KEEP");
+}
+
 reportIfMain(import.meta.url);

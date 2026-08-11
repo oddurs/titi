@@ -39,6 +39,8 @@ export interface SavedState {
   lists: number[][];
   plots: StatPlot[];
   statFreq: string | null;
+  /** Str0..Str9 */
+  strs: Record<string, string>;
   mats: Record<string, Matrix>;
   programs: ProgramSource[];
   solver: SolverState;
@@ -56,6 +58,7 @@ export function defaultSave(): SavedState {
     lists: Array.from({ length: 6 }, () => [] as number[]),
     plots: freshPlots(),
     statFreq: null,
+    strs: {},
     mats: { "[A]": identity(2) },
     programs: SAMPLE_PROGRAMS.map((p) => ({ ...p })),
     solver: {
@@ -80,6 +83,7 @@ export function serialize(state: SavedState): string {
     lists: state.lists,
     plots: state.plots,
     statFreq: state.statFreq,
+    strs: state.strs,
     mats: state.mats,
     programs: state.programs,
     solver: state.solver,
@@ -156,6 +160,9 @@ const validTbl = (v: unknown) =>
 const validPlots = (v: unknown) =>
   Array.isArray(v) && v.every((p) => isObject(p) && typeof p.on === "boolean");
 
+const validStrs = (v: unknown) =>
+  isObject(v) && Object.entries(v).every(([k, t]) => /^Str\d$/.test(k) && isStr(t));
+
 const validFreq = (v: unknown) => v === null || (isStr(v) && /^L[₁-₆]$/.test(v));
 
 export interface LoadResult {
@@ -213,6 +220,7 @@ export function deserialize(raw: string | null): LoadResult {
     lists: take("lists", validLists),
     plots: take("plots", validPlots),
     statFreq: take("statFreq", validFreq),
+    strs: take("strs", validStrs),
     mats: take("mats", validMats),
     programs: take("programs", validPrograms),
     solver: take("solver", validSolver),

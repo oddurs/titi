@@ -100,6 +100,8 @@ export const DEVICE_COMMANDS: Record<string, { args: [number, number] }> = {
   PlotsOff: { args: [0, 3] },
   "GraphStyle(": { args: [2, 2] },
   "Pt-Change(": { args: [2, 2] },
+  "Equ▸String(": { args: [2, 2] },
+  "String▸Equ(": { args: [2, 2] },
 };
 
 export const DEVICE_COMMAND_NAMES = Object.keys(DEVICE_COMMANDS);

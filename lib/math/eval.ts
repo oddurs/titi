@@ -5,7 +5,7 @@ import { MatrixError, isMatrix, type Matrix } from "./matrix";
 import * as C from "./complex";
 import { isComplex, type Complex } from "./complex";
 
-export type Val = number | number[] | Matrix | Complex;
+export type Val = number | number[] | Matrix | Complex | string;
 /** A scalar, real or complex. */
 export type Scalar = number | Complex;
 
@@ -29,6 +29,8 @@ export interface Env {
   mats: Record<string, Matrix>;
   /** term functions for u, v and w, so a definition can reference any of them */
   seqTerms?: Record<string, (n: number) => number>;
+  /** Str0..Str9 */
+  strs: Record<string, string>;
   /** When true, domain errors yield NaN instead of throwing (plotting/tables). */
   lenient: boolean;
   /**
@@ -51,6 +53,7 @@ export function makeEnv(partial: Partial<Env> = {}): Env {
     lists: {},
     ys: {},
     mats: {},
+    strs: {},
     angle: "rad",
     complex: "real",
     ans: 0,
@@ -83,6 +86,9 @@ const fail = (env: Env, msg: string): number => {
 /** Apply a scalar function element-wise, so lists and matrices just work. */
 function map1(v: Val, f: (x: number) => number): Val {
   if (typeof v === "number") return f(v);
+  // A string is not a sequence of numbers, so nothing maps over it. Without
+  // this it would reach .map and fail as a TypeError rather than an ERR:.
+  if (typeof v === "string") throw new CalcError("ERR: DATA TYPE");
   if (isMatrix(v)) return M.mapMatrix(v, f);
   if (isComplex(v)) throw new CalcError("ERR: DATA TYPE");
   return v.map(f);
@@ -101,6 +107,9 @@ function complexPair(a: Val, b: Val): [Complex, Complex] {
 }
 
 function map2(a: Val, b: Val, f: (x: number, y: number) => number): Val {
+  if (typeof a === "string" || typeof b === "string") {
+    throw new CalcError("ERR: DATA TYPE");
+  }
   if (isMatrix(a) || isMatrix(b)) {
     if (isMatrix(a) && isMatrix(b)) return M.zip(a, b, f);
     if (isMatrix(a)) {
@@ -134,7 +143,15 @@ const asMatrix = (v: Val): Matrix => {
 
 const asList = (v: Val): number[] => {
   if (typeof v === "number") return [v];
-  if (isMatrix(v) || isComplex(v)) throw new CalcError("ERR: DATA TYPE");
+  if (typeof v === "string" || isMatrix(v) || isComplex(v)) {
+    throw new CalcError("ERR: DATA TYPE");
+  }
+  return v;
+};
+
+/** A string, or a type error — the counterpart of asList for text. */
+const asText = (v: Val): string => {
+  if (typeof v !== "string") throw new CalcError("ERR: DATA TYPE");
   return v;
 };
 
@@ -586,6 +603,16 @@ function withVar(env: Env, varName: string, x: number, body: Fn): number {
 
 export function compile(node: Node): Fn {
   switch (node.t) {
+    case "str": {
+      const v = node.v;
+      return () => v;
+    }
+
+    case "strref": {
+      const name = node.name;
+      return (env) => env.strs[name] ?? "";
+    }
+
     case "num": {
       const v = node.v;
       return () => v;
@@ -718,7 +745,9 @@ export function compile(node: Node): Fn {
       const target = node.target;
       return (env) => {
         const v = e(env);
-        if (target.startsWith("[")) {
+        if (target.startsWith("Str")) {
+          env.strs[target] = asText(v);
+        } else if (target.startsWith("[")) {
           env.mats[target] = lift(() => M.clone(asMatrix(v)));
         } else if (target.startsWith("L")) {
           env.lists[target] = asList(v).slice();
@@ -737,6 +766,11 @@ export function compile(node: Node): Fn {
           return (env) => {
             const a = l(env);
             const b = r(env);
+            // Two strings join; a string and a number do not, since there is
+            // no sensible reading of "A"+1 on a device with no coercion.
+            if (typeof a === "string" || typeof b === "string") {
+              return asText(a) + asText(b);
+            }
             if (eitherComplex(a, b)) {
               return asVal(C.add(...complexPair(a, b)));
             }
@@ -794,7 +828,15 @@ export function compile(node: Node): Fn {
             }
             return map2(a, b, (x, y) => matPowScalar(env, x, y));
           };
-        case "=": return (env) => map2(l(env), r(env), (a, b) => (a === b ? 1 : 0));
+        case "=": return (env) => {
+          const x = l(env);
+          const y = r(env);
+          // Two strings compare as text; anything else is arithmetic.
+          if (typeof x === "string" || typeof y === "string") {
+            return asText(x) === asText(y) ? 1 : 0;
+          }
+          return map2(x, y, (a, b) => (a === b ? 1 : 0));
+        };
         case "≠": return (env) => map2(l(env), r(env), (a, b) => (a !== b ? 1 : 0));
         case "<": return (env) => map2(l(env), r(env), (a, b) => (a < b ? 1 : 0));
         case ">": return (env) => map2(l(env), r(env), (a, b) => (a > b ? 1 : 0));
@@ -944,6 +986,37 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
     // the lengths never do.
     // remainder( keeps the sign of the divisor, as the device does — so
     // remainder(-7,3) is 2 rather than -1.
+    // Text, not arithmetic: these are the only places a string is allowed.
+    case "length":
+      return (env) => asText(a[0](env)).length;
+
+    case "sub":
+      // sub(string, begin, count) — counted from one, as the device counts.
+      return (env) => {
+        const text = asText(a[0](env));
+        const from = Math.round(num(a[1](env)));
+        const count = Math.round(num(a[2](env)));
+        if (from < 1 || count < 0 || from + count - 1 > text.length) {
+          return fail(env, "ERR: DOMAIN");
+        }
+        return text.slice(from - 1, from - 1 + count);
+      };
+
+    case "inString":
+      // Where the second string starts inside the first, or 0 for nowhere.
+      return (env) => {
+        const hay = asText(a[0](env));
+        const needle = asText(a[1](env));
+        const from = a[2] ? Math.round(num(a[2](env))) : 1;
+        if (from < 1) return fail(env, "ERR: DOMAIN");
+        return hay.indexOf(needle, from - 1) + 1;
+      };
+
+    case "expr":
+      // The engine calling itself: the string is parsed and run as if it had
+      // been typed. Nothing is memoised, since the text can change each time.
+      return (env) => evaluate(asText(a[0](env)), env);
+
     case "remainder":
       return (env) =>
         map2(a[0](env), a[1](env), (x, y) =>

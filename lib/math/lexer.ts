@@ -19,6 +19,8 @@ export type TokKind =
   | "seqref"
   | "lbracket"
   | "rbracket"
+  | "str"
+  | "strref"
   | "unknown";
 
 export interface Token {
@@ -102,6 +104,10 @@ export const FUNCTIONS = [
   "χ²cdf(",
   "Fpdf(",
   "Fcdf(",
+  "expr(",
+  "length(",
+  "sub(",
+  "inString(",
   "fMin(",
   "fMax(",
   "randNorm(",
@@ -234,6 +240,25 @@ export function lex(src: string): Token[] {
         i += fn.length;
         continue outer;
       }
+    }
+
+    // A string runs to its closing quote, or to the end of the line — the
+    // device is forgiving about the last one, the way it is about parens.
+    if (c === '"') {
+      let j = i + 1;
+      while (j < src.length && src[j] !== '"') j += 1;
+      const text = src.slice(i, Math.min(j + 1, src.length));
+      push("str", text, src.slice(i + 1, j), i);
+      i = j + 1;
+      continue;
+    }
+
+    // Str0..Str9 hold text, and have to be found before a bare S is a variable.
+    if (src.startsWith("Str", i) && /[0-9]/.test(src[i + 3] ?? "")) {
+      const name = src.slice(i, i + 4);
+      push("strref", name, name, i);
+      i += 4;
+      continue;
     }
 
     // Words that operate: nPr and nCr are written between their arguments,

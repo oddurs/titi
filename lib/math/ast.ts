@@ -1,5 +1,7 @@
 export type Node =
   | { t: "num"; v: number; raw: string }
+  | { t: "str"; v: string }
+  | { t: "strref"; name: string }
   | { t: "const"; name: string }
   | { t: "var"; name: string }
   | { t: "list"; name: string }

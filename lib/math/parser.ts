@@ -29,6 +29,7 @@ const ARITY: Record<string, [number, number]> = {
   remainder: [2, 2], not: [1, 1],
   rectToR: [2, 2], rectToTheta: [2, 2], polarToX: [2, 2], polarToY: [2, 2],
   sortA: [1, 1], sortD: [1, 1], cumSum: [1, 1], deltaList: [1, 1], prod: [1, 3],
+  expr: [1, 1], length: [1, 1], sub: [3, 3], inString: [2, 3],
   poissonpdf: [2, 2], poissoncdf: [2, 2], geometpdf: [2, 2], geometcdf: [2, 2],
   tpdf: [2, 2], tcdf: [2, 3], invT: [2, 2],
   chi2pdf: [2, 2], chi2cdf: [2, 3], Fpdf: [3, 3], Fcdf: [3, 4],
@@ -88,7 +89,8 @@ class Parser {
         (t.kind !== "var" &&
           t.kind !== "list" &&
           t.kind !== "yref" &&
-          t.kind !== "matref")
+          t.kind !== "matref" &&
+          t.kind !== "strref")
       ) {
         throw new ParseError("ERR: SYNTAX", this.here());
       }
@@ -318,6 +320,14 @@ class Parser {
     if (t.kind === "seqref") {
       this.next();
       return { t: "seqref", name: t.value };
+    }
+    if (t.kind === "str") {
+      this.next();
+      return { t: "str", v: t.value };
+    }
+    if (t.kind === "strref") {
+      this.next();
+      return { t: "strref", name: t.value };
     }
     if (t.kind === "lbracket") return this.parseMatrixLiteral();
 

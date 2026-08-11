@@ -225,7 +225,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | `IS>(` `DS<(` | Count, then skip the next line past the bound | done | `lib/math/program.ts` |
 | `Input` into a graph screen | A bare `Input` hands over the graph and stores the cursor in X and Y | done | `lib/calc/programs.ts` |
 | `Asm(` | There is no Z80 here | out-of-scope | — |
-| Strings | A string value in the engine, with `expr(`, `sub(`, `length(`, `inString(`, `Equ▸String(` and `String▸Equ(` | todo | — |
+| Strings | A string in the value type, `Str0`–`Str9`, joining with `+`, and `expr(`, `sub(`, `length(`, `inString(`, `Equ▸String(`, `String▸Equ(` | done | `scripts/engine.test.ts` |
 
 ## MODE
 

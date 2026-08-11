@@ -264,4 +264,37 @@ check("χ²cdf(0,3.841458821,1)", ".95");
 check("tcdf(-1ᴇ99,2.228138852,10)", ".975");
 check("invT(.975,10)", "2.228138852");
 
+describe("strings");
+check('"HELLO"', "HELLO", toRad);
+check('length("HELLO")', "5");
+check('sub("HELLO",2,3)', "ELL");
+check('inString("HELLO","LL")', "3");
+check('inString("HELLO","Z")', "0");
+check('inString("ABAB","AB",2)', "3");
+check('"AB"+"CD"', "ABCD");
+check('"AB"="AB"', "1");
+check('"AB"="BA"', "0");
+// A string and a number do not join: there is no coercion on the device.
+check('"A"+1', "ERR: DATA TYPE");
+check('sub("AB",1,9)', "ERR: DOMAIN");
+check('length(5)', "ERR: DATA TYPE");
+// Arithmetic must refuse text rather than mapping over its characters.
+check('2*"AB"', "ERR: DATA TYPE");
+check('sin("AB")', "ERR: DATA TYPE");
+
+describe("expr( lets the engine call itself");
+check('expr("2+3")', "5");
+check('expr("3")+4', "7");
+check('expr("sin(0)")', "0");
+check('expr("{1,2}+1")', "{2 3}");
+// The string can be built, which is the point of having it.
+check('expr(sub("XX2+3XX",3,3))', "5");
+
+describe("the string variables");
+check('"HI"→Str1', "HI");
+check("Str1", "HI");
+check('length(Str1)', "2");
+check('Str1+"!"', "HI!");
+check("Str7", "");
+
 reportIfMain(import.meta.url);

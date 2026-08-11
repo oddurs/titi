@@ -97,9 +97,11 @@ export function formatComplex(z: Complex, opts: FormatOpts): string {
 }
 
 export function formatValue(
-  v: number | number[] | Matrix | Complex,
+  v: number | number[] | Matrix | Complex | string,
   opts: FormatOpts,
 ): string {
+  // A string answer prints as itself, without the quotes it was written with.
+  if (typeof v === "string") return v;
   if (typeof v === "number") return formatNumber(v, opts);
   if (isComplex(v)) return formatComplex(v, opts);
   if (isMatrix(v)) {

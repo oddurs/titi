@@ -147,10 +147,17 @@ the caret unable to enter it at all.
 the start of the line puts the caret on it (`onEquals`), ENTER toggles, ▶ steps
 back. There is no other control, because the panel has no DOM to hang one on.
 
-**Values are `number | number[] | Matrix | Complex`.** `map1`/`map2` in
+**Values are `number | number[] | Matrix | Complex | string`.** `map1`/`map2` in
 `eval.ts` handle the real cases, so element-wise operations work on matrices for
 free. Matrix × matrix is the real product and is special-cased; division by a
 matrix is a data-type error rather than an inverse.
+
+A string is the one value nothing maps over: `map1` and `map2` refuse it up
+front, because without that check a string reaches `.map` and fails as a
+TypeError rather than an `ERR:`. `+` joins two strings and refuses a string and
+a number — the device has no coercion. `expr(` parses and runs its argument, so
+the evaluator can call itself; nothing is memoised there, since the text can
+change between calls.
 
 **Complex is off the fast path on purpose.** Plain numbers stay plain numbers —
 plotting samples a curve thousands of times and must not allocate. A `Complex`

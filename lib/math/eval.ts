@@ -824,7 +824,8 @@ function compileCall(node: Extract<Node, { t: "call" }>): Fn {
   // ---- special forms: these need the unevaluated body ----------------------
   if (
     name === "nDeriv" || name === "fnInt" || name === "seq" ||
-    name === "sum" || name === "prod" || name === "solve"
+    name === "sum" || name === "prod" || name === "solve" ||
+    name === "fMin" || name === "fMax"
   ) {
     return compileSpecial(node);
   }
@@ -1329,6 +1330,36 @@ function compileSpecial(node: Extract<Node, { t: "call" }>): Fn {
         num(lo(env)),
         num(hi(env)),
       );
+  }
+
+  if (name === "fMin" || name === "fMax") {
+    // fMin(expression, variable, lower, upper) — golden-section search for
+    // where the expression turns, not where it crosses zero. They were wired
+    // to solve( , which finds a root instead: a different question entirely.
+    const body = compile(args[0]);
+    const varName = varNameOf(args[1]);
+    const lo = compile(args[2]);
+    const hi = compile(args[3]);
+    const wantMin = name === "fMin";
+    return (env) => {
+      let a = num(lo(env));
+      let b = num(hi(env));
+      if (a > b) [a, b] = [b, a];
+      const at = (t: number) => {
+        const y = withVar(env, varName, t, body);
+        return wantMin ? y : -y;
+      };
+      const phi = (Math.sqrt(5) - 1) / 2;
+      let c = b - phi * (b - a);
+      let d = a + phi * (b - a);
+      for (let i = 0; i < 200 && Math.abs(b - a) > 1e-12; i++) {
+        if (at(c) < at(d)) b = d;
+        else a = c;
+        c = b - phi * (b - a);
+        d = a + phi * (b - a);
+      }
+      return (a + b) / 2;
+    };
   }
 
   if (name === "solve") {

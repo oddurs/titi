@@ -12,6 +12,13 @@ has the rest). What follows is our own restatement of the *behaviour* — the
 inventory of commands and what they do — written to be worked from, not read
 for pleasure.
 
+**On the two scores.** This file measures how much of what we *chose* to build
+is done. `docs/ti84-commands.txt` and `scripts/inventory.test.ts` measure
+something harder: every function and instruction the guidebook documents,
+whether we answer to it, and — if not — whether that is planned or refused.
+That second number is the honest one for "how much of the device is this", and
+it is lower. Both are printed by `npm test`.
+
 **On checking.** `scripts/manual.test.ts` runs the guidebook's own worked
 examples — an expression and the answer the device prints for it. Three of
 those printed answers are wrong in the ninth digit and ours are right, so that
@@ -71,7 +78,7 @@ tab, and that every file referenced exists. A row that lies fails the build.
 
 | Item | Behaviour | Status | Where |
 | --- | --- | --- | --- |
-| `MATH ▸ MATH` | `▸Frac`, `▸Dec`, `x³`, `∛(`, `ˣ√(`, `fMin(`, `nDeriv(`, `fnInt(`, `solve(`, Solver | done | `lib/calc/menus.ts` |
+| `MATH ▸ MATH` | `▸Frac`, `▸Dec`, `x³`, `∛(`, `ˣ√(`, `fMin(`, `fMax(`, `nDeriv(`, `fnInt(`, `solve(`, Solver | done | `lib/calc/menus.ts` |
 | `MATH ▸ NUM` | `abs(`, `round(`, `iPart(`, `fPart(`, `int(`, `min(`, `max(`, `lcm(`, `gcd(` | done | `lib/math/eval.ts` |
 | `MATH ▸ PRB` | `rand`, `nPr`, `nCr`, `!`, `randInt(`, `randNorm(`, `randBin(`, `randIntNoRep(` — the two counters are written between their arguments, as on the device | done | `scripts/manual.test.ts` |
 | `MATH ▸ CPX` | The complex operations gathered where the device puts them | done | `lib/calc/menus.ts` |

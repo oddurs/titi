@@ -102,6 +102,8 @@ export const FUNCTIONS = [
   "χ²cdf(",
   "Fpdf(",
   "Fcdf(",
+  "fMin(",
+  "fMax(",
   "randNorm(",
   "randBin(",
   "randIntNoRep(",

@@ -16,6 +16,7 @@ import "./pwa.test";
 import "./actions.test";
 import "./demo.test";
 import "./manual.test";
+import "./inventory.test";
 import "./conformance.test";
 import "./roadmap.test";
 import { report } from "./harness";

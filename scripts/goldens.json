@@ -640,7 +640,7 @@
     ]
   },
   "menu-math": {
-    "digest": "2bc75e16",
+    "digest": "2113a240",
     "transcript": [
       "HOME MATH NUM CPX PRB RAD",
       "1:▸Frac",
@@ -649,10 +649,11 @@
       "4:∛(",
       "5:ˣ√(",
       "6:fMin(",
-      "7:nDeriv(",
-      "8:fnInt(",
-      "9:solve(",
-      "10:Solver...",
+      "7:fMax(",
+      "8:nDeriv(",
+      "9:fnInt(",
+      "10:solve(",
+      "11:Solver...",
       "READY",
       "> decimal to fraction"
     ]

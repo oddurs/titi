@@ -99,6 +99,12 @@ the spec has not admitted is missing, and every `todo` in the spec sits in
 exactly one sprint. So finishing something means moving its row to `done` in
 the spec *and* taking it off the roadmap — the tests fail otherwise.
 
+`docs/ti84-commands.txt` is the other scoreboard: every function and
+instruction the guidebook documents, as names. `scripts/inventory.test.ts`
+scores how many we answer to and fails if one is neither built nor written down
+as deliberately not built. The spec measures what we chose to build; this
+measures the whole device, and it is the lower number.
+
 TI's guidebook is the authority on the device and is linked from the spec, not
 vendored — it is their document.
 

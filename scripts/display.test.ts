@@ -29,7 +29,7 @@ describe("every screen renders");
     ["matrix", device().press("2nd matrix").repeat("right", 2).press("enter")],
     ["prgm", device().press("prgm").press("right").press("enter")],
     ["prgmrun", device().press("prgm").repeat("down", 2).press("enter")],
-    ["solver", device().press("math").repeat("down", 9).press("enter")],
+    ["solver", device().press("math").choose("Solver...")],
     ["menu", device().press("math")],
   ];
 
@@ -168,7 +168,7 @@ describe("the panel never falls back to a font");
     .press("2nd sin⁻¹").type("(.5)").press("enter")
     .press("2nd √").type("(9)").press("enter");
   ok("subscripts, inverse trig and radicals all draw", renderPanel(d.get()).count() > 0);
-  const solver = device().press("math").repeat("down", 9).press("enter");
+  const solver = device().press("math").choose("Solver...");
   ok("so does the solver", renderPanel(solver.get()).count() > 0);
   const stats = device().press("stat").press("enter").type("2").press("enter")
     .type("4").press("enter").press("stat").press("right").press("enter");

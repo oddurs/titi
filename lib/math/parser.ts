@@ -19,6 +19,7 @@ const ARITY: Record<string, [number, number]> = {
   abs: [1, 1], round: [1, 2], iPart: [1, 1], fPart: [1, 1], int: [1, 1],
   max: [1, 2], min: [1, 2], lcm: [2, 2], gcd: [2, 2],
   nDeriv: [3, 4], fnInt: [4, 5], sum: [1, 3], seq: [4, 5],
+  fMin: [3, 4], fMax: [3, 4],
   mean: [1, 2], median: [1, 2], stdDev: [1, 2], variance: [1, 2],
   randInt: [2, 3], pow10: [1, 1], expe: [1, 1], conj: [1, 1],
   det: [1, 1], identity: [1, 1], rref: [1, 1], ref: [1, 1],

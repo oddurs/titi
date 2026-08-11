@@ -230,7 +230,7 @@ export const FIXTURES: Record<string, () => Device> = {
 
   solver: () =>
     device()
-      .press("math").repeat("down", 9).press("enter")
+      .press("math").choose("Solver...")
       .press("X,T,θ,n").press("x²").press("sub").type("4").press("enter")
       .press("enter"),
 

@@ -266,7 +266,7 @@ describe("programs");
 
 describe("the solver");
 {
-  const d = device().press("math").repeat("down", 9).press("enter");
+  const d = device().press("math").choose("Solver...");
   eq("Solver opens its own screen", d.get().screen, "solver");
   d.press("X,T,θ,n").press("x²").press("sub").type("4").press("enter");
   eq("committing the equation finds its variables", Object.keys(d.get().solver.values), ["X"]);

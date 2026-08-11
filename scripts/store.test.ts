@@ -432,11 +432,11 @@ describe("the catalog");
   d.press("S");
   eq("pressing it again walks the run", at(), "Seq");
   d.press("C");
-  eq("and another letter starts its own", at(), "conj(");
+  eq("and another letter starts its own", at(), "ClrTable");
 }
 {
   const d = device().press("2nd catalog").press("C").press("enter");
-  eq("enter inserts the item, not its own alpha label", d.get().entry.text, "conj(");
+  eq("enter inserts the item, not its own alpha label", d.get().entry.text, "ClrTable");
   eq("and A-lock is released", d.get().mod, "none");
 }
 {
@@ -623,6 +623,83 @@ describe("the settings are instructions too");
   eq("and the graph mode", d.get().modes.graphMode, "pol");
   eq("and the format", d.get().modes.axes, false);
   eq("while still running its own lines", d.get().prgmRun?.output, ["1"]);
+}
+
+describe("instructions that act on the device");
+{
+  const home = () => device().press("y=").press("X,T,θ,n").press("enter").press("2nd quit");
+  const say = (d: ReturnType<typeof device>, line: string) => {
+    d.get().typeText(line);
+    d.press("enter");
+    return d;
+  };
+
+  const d = home();
+  eq("FnOff switches every slot off", say(d, "FnOff").get().ys[0].on, false);
+  eq("FnOn 1 switches one back", say(d, "FnOn 1").get().ys[0].on, true);
+  eq("GraphStyle sets the style", say(d, "GraphStyle(1,2)").get().ys[0].style, "thick");
+  eq("styles past thick become dots", say(d, "GraphStyle(1,5)").get().ys[0].style, "dot");
+  eq("a slot that does not exist is a domain error",
+    say(home(), "GraphStyle(9,1)").get().message, "ERR: DOMAIN");
+
+  eq("DispGraph goes there", say(home(), "DispGraph").get().screen, "graph");
+  eq("DispTable too", say(home(), "DispTable").get().screen, "table");
+  eq("and each answers Done", say(home(), "DispGraph").get().history.at(-1)?.output, "Done");
+}
+{
+  const d = device().press("y=").press("X,T,θ,n").press("enter").press("2nd quit");
+  d.get().typeText("Pt-Change(1,2)");
+  d.press("enter");
+  eq("Pt-Change draws a point", d.get().drawings.length, 1);
+  d.get().typeText("Pt-Change(1,2)");
+  d.press("enter");
+  eq("and the same point again takes it off", d.get().drawings.length, 0);
+}
+{
+  // ZoomStat fits the window to whatever the plots hold.
+  const d = device().press("stat").press("enter");
+  for (const v of ["2", "5", "9", "14"]) d.type(v).press("enter");
+  d.press("right");
+  for (const v of ["1", "4", "9", "16"]) d.type(v).press("enter");
+  d.press("2nd quit").press("2nd stat plot").choose("Scatter");
+  d.get().typeText("ZoomStat");
+  d.press("enter");
+  const w = d.get().win;
+  ok("x fits the data with a little room", w.xmin < 2 && w.xmax > 14, `${w.xmin}..${w.xmax}`);
+  ok("and so does y", w.ymin < 1 && w.ymax > 16, `${w.ymin}..${w.ymax}`);
+  eq("it shows the graph", d.get().screen, "graph");
+
+  d.get().typeText("ZPrevious");
+  d.press("enter");
+  eq("ZPrevious puts the old window back", d.get().win.xmin, -10);
+  d.get().typeText("ZPrevious");
+  d.press("enter");
+  ok("and again returns to the fitted one", d.get().win.xmin < 2);
+}
+{
+  const d = device();
+  d.get().typeText("ZoomStat");
+  d.press("enter");
+  eq("with no plot there is nothing to fit", d.get().message, "ERR: STAT");
+}
+{
+  // In Ask mode, ClrTable empties the column.
+  const d = device().press("2nd tblset").repeat("down", 2).press("right")
+    .press("2nd table").type("3").press("enter").type("5").press("enter");
+  eq("two values were asked for", d.get().tbl.ask.length, 2);
+  d.press("2nd quit");
+  d.get().typeText("ClrTable");
+  d.press("enter");
+  eq("ClrTable empties them", d.get().tbl.ask, []);
+}
+{
+  const d = device();
+  d.get().programs.push({ name: "SHOW", body: "Polar\nFnOff\nGraphStyle(1,2)\nDispGraph" });
+  d.press("prgm").choose("SHOW");
+  eq("a program sets the mode", d.get().modes.graphMode, "pol");
+  eq("switches a slot off", d.get().ys[0].on, false);
+  eq("sets a style", d.get().ys[0].style, "thick");
+  eq("and ends up on the graph", d.get().screen, "graph");
 }
 
 reportIfMain(import.meta.url);

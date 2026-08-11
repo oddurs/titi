@@ -80,3 +80,61 @@ export function parseModeCommand(line: string): ModeChange | null {
 
 /** Every name this module answers to, for the catalog and for the tests. */
 export const MODE_COMMAND_NAMES = [...Object.keys(MODE_COMMANDS), "Fix"];
+
+/**
+ * Instructions that do something to the device rather than set a mode.
+ *
+ * Only the shape lives here — the name, and how many arguments it takes. What
+ * each one *does* needs the store, and the store is not something this module
+ * is allowed to know about, so it keeps the behaviour and reads the shapes.
+ */
+export const DEVICE_COMMANDS: Record<string, { args: [number, number] }> = {
+  DispGraph: { args: [0, 0] },
+  DispTable: { args: [0, 0] },
+  ClrTable: { args: [0, 0] },
+  ZoomStat: { args: [0, 0] },
+  ZPrevious: { args: [0, 0] },
+  FnOn: { args: [0, 6] },
+  FnOff: { args: [0, 6] },
+  PlotsOn: { args: [0, 3] },
+  PlotsOff: { args: [0, 3] },
+  "GraphStyle(": { args: [2, 2] },
+  "Pt-Change(": { args: [2, 2] },
+};
+
+export const DEVICE_COMMAND_NAMES = Object.keys(DEVICE_COMMANDS);
+
+/** The instruction on this line, with its arguments still unevaluated. */
+export function parseDeviceCommand(
+  line: string,
+): { name: string; args: string[] } | null {
+  const src = line.trim();
+  for (const name of DEVICE_COMMAND_NAMES) {
+    if (name.endsWith("(")) {
+      if (!src.startsWith(name)) continue;
+      const inner = src.slice(name.length).replace(/\)$/, "");
+      return { name, args: splitArgs(inner) };
+    }
+    if (src !== name && !src.startsWith(`${name} `)) continue;
+    return { name, args: splitArgs(src.slice(name.length)) };
+  }
+  return null;
+}
+
+/** Commas at the top level only, so Pt-Change(A,sum({1,2})) still splits in two. */
+function splitArgs(src: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (c === "(" || c === "{" || c === "[") depth += 1;
+    else if (c === ")" || c === "}" || c === "]") depth -= 1;
+    else if (c === "," && depth === 0) {
+      out.push(src.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(src.slice(start));
+  return out.map((a) => a.trim()).filter((a) => a !== "");
+}

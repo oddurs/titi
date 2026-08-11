@@ -28,19 +28,10 @@ day with tests, `L` needs a design decision first.
 | 8 | Programs that react — getKey, a placed Output(, IS>( and DS<(, and Input on the graph | `2516be5` |
 | 9 | The graph's last controls — a FORMAT screen, ZoomSto and ZoomRcl, DrawF, DrawInv, Shade(, and CALC in every mode | `997cf6b` |
 | 10 | Editing, memory and the engine's leftovers — error Goto, a real RCL, Mem Mgmt, the logic connectives, remainder(, the CPX tab | `63835b9` |
-| 11 | Modes as instructions — thirty settings given names, plus the axes, the traced expression, the coordinate format and Depend | pending |
+| 11 | Modes as instructions — thirty settings given names, plus the axes, the traced expression, the coordinate format and Depend | `750fc25` |
+| 12 | Graph and table instructions — ten of them, and a window that remembers what it was | pending |
 
 ---
-
-## Sprint 12 — Graph and table instructions
-
-**Why now.** The other half of what makes a program able to drive the device
-rather than only compute. Everything here already exists behind a keypress;
-this gives it a name.
-
-| Spec row | What it takes | Size |
-| --- | --- | --- |
-| Graph and table instructions | `DispGraph`, `DispTable`, `ClrTable`, `FnOn`, `FnOff`, `GraphStyle(`, `Select(`, `ZoomStat`, `ZPrevious`, `PlotsOn`, `Pt-Change(`. Each maps onto something the store already does; `ZoomStat` needs a window fitted to the stat lists, and `ZPrevious` one more slot beside ZoomSto. | M |
 
 ## Sprint 13 — Strings
 
@@ -71,6 +62,7 @@ MATRX MATH menu. Small enough to finish the list on.
 | Spec row | What it takes | Size |
 | --- | --- | --- |
 | Row operations | `rowSwap(`, `row+(`, `*row(`, `*row+(` — exchange, add, scale, and scale-and-add. `matrix.ts` already has the elimination that uses all four internally. | S |
+| `Select(` | Choosing a range off a scatter plot with the cursor and copying those points into two lists. Interactive, which is why it did not come with the other graph instructions. | M |
 
 ---
 

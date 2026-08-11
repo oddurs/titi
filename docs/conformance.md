@@ -141,7 +141,8 @@ tab, and that every file referenced exists. A row that lies fails the build.
 | `TBLSET` | `TblStart`, `ΔTbl` | done | `lib/display/screens.ts` |
 | `Indpnt: Ask` | The X column is typed; ENTER adds a row, DEL takes one back | done | `scripts/store.test.ts` |
 | `Depend: Ask` | The Y columns stay empty rather than filling themselves in | done | `lib/display/screens.ts` |
-| Graph and table instructions | `DispGraph`, `DispTable`, `ClrTable`, `FnOn`, `FnOff`, `GraphStyle(`, `Select(`, `ZoomStat`, `ZPrevious`, `PlotsOn`, `Pt-Change(` | todo | — |
+| Graph and table instructions | `DispGraph`, `DispTable`, `ClrTable`, `FnOn`, `FnOff`, `GraphStyle(`, `ZoomStat`, `ZPrevious`, `PlotsOn`, `Pt-Change(` | done | `lib/calc/instructions.ts` |
+| `Select(` | Choosing a range of points off a scatter plot and copying them into two lists | todo | — |
 
 ## Statistics
 

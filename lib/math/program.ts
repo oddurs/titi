@@ -180,7 +180,7 @@ export class Interpreter {
     this.stack.push(parseProgram(entry.name, entry.body));
   }
 
-  /** Set by the caller: which lines are mode instructions rather than maths. */
+  /** Set by the caller: which lines are instructions rather than maths. */
   isModeCommand: (line: string) => boolean = () => false;
 
   /** Store where the cursor was left, for a bare Input. */
@@ -271,8 +271,8 @@ export class Interpreter {
 
   /** Returns a Status when the program needs to suspend, otherwise undefined. */
   private exec(f: Frame, line: string): Status | undefined {
-    // A mode instruction is the whole line and means nothing to the maths, so
-    // it is recorded for the caller before anything tries to evaluate it.
+    // A device instruction is the whole line and means nothing to the maths,
+    // so it is recorded for the caller before anything tries to evaluate it.
     if (this.isModeCommand(line.trim())) {
       this.modeChanges.push(line.trim());
       f.pc += 1;

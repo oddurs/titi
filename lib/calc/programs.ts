@@ -1,5 +1,5 @@
 import { Interpreter, type DrawCommand } from "../math/program";
-import { parseModeCommand } from "./instructions";
+import { parseModeCommand, parseDeviceCommand } from "./instructions";
 import type { Env } from "../math/eval";
 import type { Drawing, MenuState, ScreenId } from "./types";
 import type { CalcState } from "./store";
@@ -19,6 +19,8 @@ export interface ProgramsCtx {
   persist(): void;
   syncEnv(patch?: Partial<CalcState>): void;
   gotoScreen(screen: ScreenId): void;
+  /** DispGraph, FnOff and the rest — the store owns what they do. */
+  runDeviceCommand(name: string, args: string[]): boolean;
 }
 
 export function createPrograms(ctx: ProgramsCtx) {
@@ -70,15 +72,25 @@ function drainModes() {
   if (!vm || !vm.modeChanges.length) return;
   let modes = { ...get().modes };
   let tbl = { ...get().tbl };
+  const devices: string[] = [];
   for (const line of vm.modeChanges) {
     const change = parseModeCommand(line);
-    if (!change) continue;
+    if (!change) {
+      devices.push(line);
+      continue;
+    }
     modes = { ...modes, ...change.modes };
     tbl = { ...tbl, ...change.tbl };
   }
   vm.modeChanges.length = 0;
   set({ modes, tbl });
   syncEnv({ modes });
+  // The device instructions run after the modes, so a program can set the
+  // graph mode and then ask to see the graph in that order.
+  for (const line of devices) {
+    const cmd = parseDeviceCommand(line);
+    if (cmd) ctx.runDeviceCommand(cmd.name, cmd.args);
+  }
 }
 
 /** Apply everything the program drew since the last pump. */
@@ -172,8 +184,10 @@ function startProgram(name: string) {
     { notation: st.modes.notation, decimals: st.modes.decimals },
     (n) => get().programs.find((p) => p.name === n),
   );
-  // lib/math has no idea what a device mode is, so it asks.
-  vm.isModeCommand = (line) => parseModeCommand(line) !== null;
+  // lib/math has no idea what a device instruction is, so it asks. Both kinds
+  // come back through the same list and are told apart when they are applied.
+  vm.isModeCommand = (line) =>
+    parseModeCommand(line) !== null || parseDeviceCommand(line) !== null;
   set({
     screen: "prgmrun",
     menu: null,

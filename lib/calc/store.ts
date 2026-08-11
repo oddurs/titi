@@ -7,7 +7,9 @@ import { isMatrix } from "../math/matrix";
 import { nextBoundary, prevBoundary } from "../math/lexer";
 import { keyById, keyCode } from "./keys";
 import { ParseError } from "../math/ast";
-import { parseModeCommand, MODE_COMMAND_NAMES } from "./instructions";
+import {
+  parseModeCommand, parseDeviceCommand, MODE_COMMAND_NAMES, DEVICE_COMMAND_NAMES,
+} from "./instructions";
 import { MENUS } from "./menus";
 import type { StatReport } from "../math/stats";
 import { createReports } from "./reports";
@@ -43,6 +45,7 @@ import { createPrograms } from "./programs";
 import type {
   CalcMark,
   Drawing,
+  PlotStyle,
   EditTarget,
   Entry,
   GraphWindow,
@@ -136,6 +139,8 @@ export interface CalcState {
   errorSrc: string;
   /** a window put aside by ZoomSto, for ZoomRcl to bring back */
   savedWin: GraphWindow | null;
+  /** the window before the last zoom, for ZPrevious */
+  prevWin: GraphWindow | null;
   /** free-moving cursor on the graph when not tracing */
   cursor: { x: number; y: number } | null;
   graphPrompt: {
@@ -264,9 +269,13 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     }
   }
 
-  function commitHome() {
+  /**
+   * Returns true when the line has already decided which screen to be on —
+   * DispGraph and friends — so the caller does not drag it back home.
+   */
+  function commitHome(): boolean {
     const src = get().entry.text.trim();
-    if (!src) return;
+    if (!src) return false;
 
     // A mode instruction is the whole line: it sets something and answers
     // Done, the way the device does, rather than being parsed as maths.
@@ -284,7 +293,23 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         entryIndex: -1,
       });
       persist();
-      return;
+      return false;
+    }
+
+    const device = parseDeviceCommand(src);
+    if (device) {
+      const before = get().screen;
+      if (runDeviceCommand(device.name, device.args)) {
+        set({
+          history: [
+            ...get().history,
+            { id: get().history.length + 1, input: src, output: "Done", isError: false },
+          ].slice(-80),
+          entry: { text: "", caret: 0 },
+          entryIndex: -1,
+        });
+        return get().screen !== before;
+      }
     }
 
     const { ok, text, at } = evalEntry();
@@ -325,6 +350,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     // A store into a Y-variable should be reflected in the editor list.
     syncEnv();
     persist();
+    return false;
   }
 
   /** What a plot is set to, for the toast that follows an edit. */
@@ -333,6 +359,144 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     const lists = oneList ? p.xList : `${p.xList},${p.yList}`;
     const freq = p.freqList ? ` freq ${p.freqList}` : "";
     return `Plot${slot + 1} ${p.type} ${lists} ${p.mark}${freq}`;
+  }
+
+  /**
+   * The instructions that act on the device rather than set a mode.
+   *
+   * Their arguments are ordinary expressions, so they are evaluated here
+   * rather than parsed — FnOff A works, and so does GraphStyle(N,3).
+   */
+  function runDeviceCommand(name: string, rawArgs: string[]): boolean {
+    const st = get();
+    let args: number[];
+    try {
+      args = rawArgs.map((a) => {
+        const v = evaluate(a, env);
+        if (typeof v !== "number") throw new CalcError("ERR: DATA TYPE");
+        return v;
+      });
+    } catch {
+      note("ERR: ARGUMENT");
+      return true;
+    }
+
+    const slots = (list: number[], count: number) =>
+      list.length ? list.map((n) => Math.round(n) - 1) : Array.from({ length: count }, (_, i) => i);
+
+    switch (name) {
+      case "DispGraph":
+        gotoScreen("graph");
+        return true;
+      case "DispTable":
+        gotoScreen("table");
+        return true;
+      case "ClrTable":
+        set({ tbl: { ...st.tbl, ask: [] }, revision: st.revision + 1 });
+        persist();
+        return true;
+
+      case "FnOn":
+      case "FnOff": {
+        const on = name === "FnOn";
+        const wanted = new Set(slots(args, 6));
+        const ys = st.ys.map((y, i) => (wanted.has(i) ? { ...y, on } : y));
+        set({ ys, revision: st.revision + 1 });
+        syncEnv({ ys });
+        persist();
+        return true;
+      }
+
+      case "PlotsOn":
+      case "PlotsOff": {
+        const on = name === "PlotsOn";
+        const wanted = new Set(slots(args, 3));
+        const plots = st.plots.map((p, i) => (wanted.has(i) ? { ...p, on } : p));
+        set({ plots, revision: st.revision + 1 });
+        persist();
+        return true;
+      }
+
+      case "GraphStyle(": {
+        // The device numbers seven styles; we draw three, so anything past
+        // thick is a dotted line rather than a style we cannot honour.
+        const slot = Math.round(args[0]) - 1;
+        const style = Math.round(args[1]);
+        if (slot < 0 || slot > 5) {
+          note("ERR: DOMAIN");
+          return true;
+        }
+        const named: PlotStyle = style <= 1 ? "line" : style === 2 ? "thick" : "dot";
+        const ys = st.ys.map((y, i) => (i === slot ? { ...y, style: named } : y));
+        set({ ys, revision: st.revision + 1 });
+        persist();
+        return true;
+      }
+
+      case "Pt-Change(": {
+        // Toggle: a point already drawn there comes off again.
+        const [x, y] = args;
+        const near = (a: number, b: number, span: number) => Math.abs(a - b) < span / 80;
+        const w = st.win;
+        const at = st.drawings.findIndex(
+          (d) => d.kind === "point" && near(d.x, x, w.xmax - w.xmin) && near(d.y, y, w.ymax - w.ymin),
+        );
+        const drawings =
+          at >= 0
+            ? st.drawings.filter((_, i) => i !== at)
+            : [...st.drawings, { kind: "point" as const, x, y }];
+        set({ drawings, revision: st.revision + 1 });
+        return true;
+      }
+
+      case "ZoomStat": {
+        // Fit the window to whatever the switched-on plots hold.
+        const xs: number[] = [];
+        const ys: number[] = [];
+        for (const p of st.plots) {
+          if (!p.on) continue;
+          const index = (nm: string) => "₁₂₃₄₅₆".indexOf(nm.slice(-1));
+          const xl = st.lists[index(p.xList)] ?? [];
+          xs.push(...xl);
+          if (p.type === "scatter" || p.type === "line") ys.push(...(st.lists[index(p.yList)] ?? []));
+          else ys.push(0, xl.length);
+        }
+        if (!xs.length) {
+          note("ERR: STAT");
+          return true;
+        }
+        const pad = (lo: number, hi: number) => {
+          const span = hi - lo || Math.abs(hi) || 1;
+          return [lo - span * 0.1, hi + span * 0.1] as const;
+        };
+        const [xmin, xmax] = pad(Math.min(...xs), Math.max(...xs));
+        const [ymin, ymax] = pad(Math.min(...ys), Math.max(...ys));
+        set({
+          prevWin: { ...st.win },
+          win: { ...st.win, xmin, xmax, ymin, ymax },
+          screen: "graph",
+          revision: st.revision + 1,
+        });
+        persist();
+        return true;
+      }
+
+      case "ZPrevious": {
+        if (!st.prevWin) {
+          note("No previous window");
+          return true;
+        }
+        set({
+          win: { ...st.prevWin },
+          prevWin: { ...st.win },
+          screen: "graph",
+          revision: st.revision + 1,
+        });
+        persist();
+        return true;
+      }
+    }
+    return false;
   }
 
   /** null means unparseable; undefined means the field was left blank. */
@@ -727,6 +891,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     provideProgramPoint,
   } = createPrograms({
     get, set, env, note, persist, syncEnv, gotoScreen,
+    runDeviceCommand: (name, args) => runDeviceCommand(name, args),
   });
 
   // -- menus ----------------------------------------------------------------
@@ -1280,8 +1445,8 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         }
         if (st.target.kind === "home") {
           if (st.graphPrompt) return void resolveGraphPrompt();
-          commitHome();
-          set({ screen: "home", statReport: null });
+          const movedScreen = commitHome();
+          if (!movedScreen) set({ screen: "home", statReport: null });
           return;
         }
         if (st.target.kind === "matrix") {
@@ -1431,6 +1596,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
     powered: true,
     errorSrc: "",
     savedWin: null,
+    prevWin: null,
     marks: [],
     drawings: [],
     plots: freshPlots(),

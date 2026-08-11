@@ -52,10 +52,7 @@ const planned = (why: string, names: string[]) => {
   for (const n of names) TODO[n] = why;
 };
 
-planned("graph and table instructions a program can use", [
-  "ClrTable", "DispGraph", "DispTable", "FnOff", "FnOn", "GraphStyle(",
-  "Select(", "ZoomStat", "ZPrevious", "PlotsOn", "Pt-Change(",
-]);
+planned("choosing points off a plot, which is interactive", ["Select("]);
 planned("strings, which TI-BASIC leans on heavily", [
   "expr(", "inString(", "length(", "sub(", "Equ▸String(", "String▸Equ(",
 ]);

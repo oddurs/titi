@@ -102,6 +102,20 @@ the spec *and* taking it off the roadmap — the tests fail otherwise.
 TI's guidebook is the authority on the device and is linked from the spec, not
 vendored — it is their document.
 
+## The demo runner
+
+`#demo` in the address shows a strip of guided tours over the shell;
+`lib/calc/demo.ts` holds them as data and `components/DemoBar.tsx` drives them
+through the store's own `press`, one key at a time. It renders nothing at all
+without the hash, which is what keeps it out of the product and out of the
+keypad's single tab stop.
+
+Tours name keys by the label printed on them (`"2nd quit"`, `"X,T,θ,n"`, `"12"`
+for a run of digits), so writing one reads like describing it.
+`scripts/demo.test.ts` runs every tour through a real store and asserts where it
+lands — a renamed key or a reordered menu fails a test rather than a
+demonstration.
+
 ## Things that are load-bearing
 
 **The `env` object is mutated in place.** `store.env` is a stable reference the

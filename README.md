@@ -129,6 +129,20 @@ spec the same way: every missing feature had to be scheduled exactly once. It
 is empty now — the spec has no `todo` rows left. What remains is the
 `out-of-scope` list, which stays out on purpose and says why.
 
+### Demoing it
+
+Add `#demo` to the address and a strip of guided tours appears above the
+device: a polar rose, tracing to a zero, shading an integral, fitting a line to
+data, drawing on the graph, and running a program. Each one drives the real
+keypad one key at a time and captions what it is doing, so you can watch rather
+than remember which buttons to press. Press any key to take over.
+
+It is hidden without the hash, because it is a tool for showing the device
+rather than part of it. The tours live in `lib/calc/demo.ts` as data — a name,
+a blurb, and steps of keys named by the labels printed on them — and
+`scripts/demo.test.ts` runs every one of them and checks it ends where it says
+it does, so a tour cannot rot between demonstrations.
+
 ### Checking it
 
 `npm test` runs everything that does not need a browser — the engine, the

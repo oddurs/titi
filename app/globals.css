@@ -747,6 +747,87 @@ button {
   border-color: color-mix(in oklab, var(--blue) 45%, transparent);
 }
 
+/* --- demo runner ---------------------------------------------------------
+   A tool laid on the stage, not part of the instrument: flat, quiet, and
+   obviously not made of the same plastic as the device. */
+
+.demo {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background: rgba(8, 9, 11, 0.92);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(6px);
+  font-family: var(--font-mono);
+}
+
+.demo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.demo-tag {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.demo-pick,
+.demo-stop {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.74rem;
+}
+
+.demo-pick:hover,
+.demo-stop:not(:disabled):hover {
+  color: var(--text);
+  border-color: color-mix(in oklab, var(--blue) 50%, transparent);
+}
+
+.demo-pick[data-running="true"] {
+  color: var(--text);
+  border-color: var(--blue);
+  background: color-mix(in oklab, var(--blue) 18%, transparent);
+}
+
+.demo-stop:disabled {
+  opacity: 0.35;
+}
+
+.demo-say {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text);
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-height: 1.2em;
+}
+
+.demo-count {
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.demo-idle {
+  color: var(--faint);
+}
+
 /* --- phone layout -------------------------------------------------------
    Declared last so it wins over the base rules above. */
 
@@ -795,5 +876,38 @@ button {
     top: 3px;
     left: 5px;
     font-size: 8px;
+  }
+
+  /* There is no room above the device on a phone, so the demo runner sits
+     under it instead — where it covers the keypad's last row rather than the
+     panel, which is the half you are demonstrating. */
+  .demo {
+    top: auto;
+    bottom: 0;
+    border-bottom: none;
+    border-top: 1px solid var(--line);
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    gap: 4px;
+  }
+
+  .demo-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .demo-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .demo-pick,
+  .demo-stop {
+    flex: 0 0 auto;
+    font-size: 0.68rem;
+    padding: 4px 8px;
+  }
+
+  .demo-say {
+    font-size: 0.7rem;
   }
 }

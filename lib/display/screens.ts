@@ -2,7 +2,7 @@ import { formatNumber } from "../math/format";
 import { evaluate } from "../math/eval";
 import { slotLabels } from "../calc/curves";
 import { PLOT_COLORS } from "../calc/colors";
-import { modeRowsFor, MODE_ROWS, solverRows, visibleWindowFields, windowLabel } from "../calc/layout";
+import { modeRowsFor, solverRows, visibleWindowFields, windowLabel } from "../calc/layout";
 import type { CalcState } from "../calc/store";
 import { CHAR_H, CHAR_W, INK, Pen } from "./pen";
 import { graphReadout, renderGraph } from "./graph";

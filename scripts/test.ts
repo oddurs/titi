@@ -14,6 +14,7 @@ import "./persistence.test";
 import "./golden.test";
 import "./pwa.test";
 import "./actions.test";
+import "./demo.test";
 import "./manual.test";
 import "./conformance.test";
 import "./roadmap.test";

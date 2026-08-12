@@ -287,8 +287,11 @@ through `Pen`, never straight to the context, or it vanishes from that mirror.
 
 ## CSS
 
-One stylesheet, `app/globals.css`, in plain CSS with custom properties. Tailwind
-is installed but unused for this UI — do not mix approaches. It now styles only
+One stylesheet, `app/globals.css`, in plain CSS with custom properties. There is
+no CSS framework: Tailwind was here for its reset alone and has been replaced by
+the reset itself, at the top of that file. Removing it changed the rendered
+pixels at neither viewport. Do not reach for a utility framework — every surface
+is hand-written, and mixing the two approaches is how a design like this rots. It now styles only
 the hardware: shell, bezel, keypad, arrow cluster. Anything inside the glass is
 drawn, not styled.
 

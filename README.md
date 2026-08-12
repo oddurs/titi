@@ -1,5 +1,10 @@
 # titi
 
+[![Check](https://github.com/oddurs/titi/actions/workflows/ci.yml/badge.svg)](https://github.com/oddurs/titi/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+**[Try it →](https://oddurs.github.io/titi/)**
+
 A scientific and graphing calculator for the browser, with the TI-84 Plus's
 keypad and workflow — every key in its real position, `2ND` and `ALPHA`
 modifiers, the `Y=` → `WINDOW` → `GRAPH` → `TRACE` loop.
@@ -261,11 +266,41 @@ live region — the panel's contents in words, from the same call that drew them
 The keypad is real buttons throughout, labelled with whatever the active
 modifier makes them do.
 
-## Not implemented
+## How much of the device is here
 
-`CALC` is defined against `y(x)` and says so rather than guessing in the other
-graph modes. The finance solver and `APPS` are absent, and complex values stay
-out of lists and matrices.
+Two numbers, both printed by `npm test`, because they measure different things.
+
+`docs/conformance.md` is the spec — what we set out to build, and how much of it
+is done. `docs/ti84-commands.txt` is every function and instruction the
+guidebook documents, and `scripts/inventory.test.ts` scores how many the app
+answers to. The second number is the honest one, and it is lower.
+
+Deliberately absent, each with its reason recorded in the spec: linking and
+assembly language (there is no second calculator and no Z80), inferential
+statistics, the finance solver, split screens, pixel addressing, stored
+pictures, and complex values inside lists and matrices.
+
+## Contributing
+
+Issues and pull requests are welcome. `CONTRIBUTING.md` is the short version and
+`CLAUDE.md` is the long one — the latter is a map of what is load-bearing in
+this codebase and why, which is worth reading before changing the display or
+the store.
+
+The one house rule: `npm run check` has to pass, and anything that touches what
+is on screen wants `npm run verify` too.
+
+## About the TI-84 Plus
+
+This is an independent reimplementation, written from the published behaviour of
+the device. It is not affiliated with, authorised by, or endorsed by Texas
+Instruments. TI-84 Plus and TI are trademarks of Texas Instruments Incorporated,
+used here only to say what this is modelled on.
+
+No part of TI's software is included. `docs/ti84-commands.txt` is a list of
+command names — an inventory of the surface, kept so the tests can score
+coverage against it — and TI's guidebook is linked from the spec rather than
+copied into it.
 
 ## License
 

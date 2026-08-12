@@ -1,0 +1,42 @@
+name: Check
+
+# Every push and every pull request, so a contributor finds out from the
+# repository rather than from a reviewer.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Types, lint and every suite — about a second for the last of those.
+      - run: npm run check
+      - run: npm run build
+
+  browser:
+    # The half the suites cannot reach: rendering, hydration, overflow, the
+    # keypad's single tab stop, and an offline load with the network cut.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run verify
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: .verify/
+          if-no-files-found: ignore

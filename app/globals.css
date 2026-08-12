@@ -1,4 +1,33 @@
-@import "tailwindcss";
+/* The whole of what Tailwind was here for.
+
+   Nothing in this app uses a utility class — every surface is hand-written
+   below — so importing the framework was paying a build dependency and a
+   large stylesheet for a reset. This is the reset, stated outright, which is
+   also the only part anything here relied on. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+img,
+svg,
+canvas {
+  display: block;
+  max-width: 100%;
+}
 
 /* ---------------------------------------------------------------------------
    Titi — a graphing calculator that keeps the TI-84's muscle memory and

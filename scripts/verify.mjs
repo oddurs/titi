@@ -62,11 +62,23 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.listen(PORT, r));
 const origin = `http://localhost:${PORT}/`;
 
+/**
+ * Chrome if the machine has it, the bundled browser otherwise — a laptop
+ * usually has the first and a CI runner only ever has the second.
+ */
 let browser;
-try {
-  browser = await chromium.launch({ channel: "chrome" });
-} catch {
-  console.error("Could not launch Chrome. Install it, or run the tests only.");
+for (const attempt of [{ channel: "chrome" }, {}]) {
+  try {
+    browser = await chromium.launch(attempt);
+    break;
+  } catch {
+    /* try the next one */
+  }
+}
+if (!browser) {
+  console.error(
+    "No browser to check with. Install Chrome, or run `npx playwright install chromium`.",
+  );
   server.close();
   process.exit(2);
 }

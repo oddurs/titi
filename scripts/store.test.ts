@@ -793,4 +793,65 @@ describe("the clock");
   eq("and a minute earlier reads as a minute", Number(d.get().history.at(-1)?.output) >= 60, true);
 }
 
+describe("the paths nothing had reached");
+{
+  // Seven dispatcher branches had no test at all. These are them, and one of
+  // them is a headline feature.
+  const say = (d: ReturnType<typeof device>, line: string) => {
+    d.get().typeText(line);
+    d.press("enter");
+    return d;
+  };
+
+  // ▸Frac and ▸Dec, from the MATH menu.
+  {
+    const d = device().type("7/8").press("enter").press("math").choose("▸Frac");
+    eq("▸Frac turns the answer into a fraction", d.get().history.at(-1)?.output, "7/8");
+    const whole = device().type("4/2").press("enter").press("math").choose("▸Frac");
+    eq("a whole number keeps no denominator", whole.get().history.at(-1)?.output, "2");
+    const irrational = device().press("2nd √").type("2").press("rparen").press("enter")
+      .press("math").choose("▸Frac");
+    eq("and something that is not a fraction says so",
+      irrational.get().message, "ERR: NOT A FRACTION");
+  }
+  {
+    const d = device().type("1/8").press("enter").press("math").choose("▸Dec");
+    eq("▸Dec goes back the other way", d.get().history.at(-1)?.output, ".125");
+  }
+
+  // The ANGLE menu sets the mode.
+  {
+    const d = device().press("2nd angle").choose("Degree");
+    eq("Degree from the menu", d.get().modes.angle, "deg");
+    eq("and Radian back", d.press("2nd angle").choose("Radian").get().modes.angle, "rad");
+  }
+
+  // VARS ▸ WINDOW pastes a window value into the line.
+  {
+    const d = device().press("vars").press("right").choose("Xmin");
+    eq("Xmin comes back as its value", d.get().entry.text, "-10");
+  }
+
+  // MEMORY ▸ ClrHome empties the tape.
+  {
+    const d = device().type("1+1").press("enter").type("2+2").press("enter");
+    eq("there is something to clear", d.get().history.length, 2);
+    d.press("2nd mem").choose("ClrHome");
+    eq("ClrHome empties it", d.get().history, []);
+  }
+
+  // PlotsOn and PlotsOff as instructions.
+  {
+    const d = device().press("2nd stat plot").choose("On/Off");
+    eq("a plot is on", d.get().plots[0].on, true);
+    say(d, "PlotsOff");
+    eq("PlotsOff switches them all off", d.get().plots.some((p) => p.on), false);
+    say(d, "PlotsOn");
+    eq("PlotsOn switches them all on", d.get().plots.every((p) => p.on), true);
+    say(d, "PlotsOff 2");
+    eq("and one at a time", d.get().plots[1].on, false);
+    eq("leaving the others", d.get().plots[0].on, true);
+  }
+}
+
 reportIfMain(import.meta.url);

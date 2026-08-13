@@ -34,6 +34,10 @@ keeps it quick. Two harnesses do most of the work:
   missing from the character ROM, so reaching an awkward screen is itself an
   assertion.
 
+If you add a branch to the store's action dispatcher, write a test that reaches
+it — `scripts/coverage.test.ts` will fail until you do. That guard exists
+because seven branches had no test at all, and two of them were broken.
+
 There are also three scoreboards that fail rather than rot: the conformance spec
 is checked against the code, the roadmap against the spec, and the command
 inventory against the engine.

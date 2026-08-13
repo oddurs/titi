@@ -377,6 +377,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
    * rather than parsed — FnOff A works, and so does GraphStyle(N,3).
    */
   function runDeviceCommand(name: string, rawArgs: string[]): boolean {
+    reachedCommands.add(name);
     const st = get();
 
     // These two copy text between a Y= slot and a string variable, so their
@@ -1129,6 +1130,10 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
   function runAction(action: string) {
     const st = get();
     const [verb, arg, arg2] = action.split(":");
+    // Two lines of book-keeping that buy a real guarantee: scripts/coverage
+    // .test.ts fails if the suite never reaches one of these branches. Seven
+    // of them had no test at all when this was added, ▸Frac among them.
+    reachedVerbs.add(verb);
 
     switch (verb) {
       case "screen":
@@ -1331,8 +1336,12 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
         return;
 
       case "toFrac": {
-        const { ok } = evalEntry();
-        const raw = ok ? env.ans : null;
+        // With nothing typed this converts the last answer, which is how it is
+        // reached nine times in ten: work something out, then ask for it as a
+        // fraction. evalEntry answers "not ok" on an empty line, so taking its
+        // word for it meant the common case did nothing at all.
+        const typed = st.entry.text.trim();
+        const raw = typed ? (evalEntry().ok ? env.ans : null) : env.ans;
         if (typeof raw !== "number") return note("ERR: DATA TYPE");
         const f = toFraction(raw);
         if (!f) return note("ERR: NOT A FRACTION");
@@ -1341,7 +1350,7 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
             ...st.history,
             {
               id: st.history.length + 1,
-              input: st.entry.text.trim() || formatNumber(raw, fmt()),
+              input: `${typed || formatNumber(raw, fmt())}▸Frac`,
               output: f.d === 1 ? String(f.n) : `${f.n}/${f.d}`,
               isError: false,
             },
@@ -1353,6 +1362,25 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
       }
 
       case "toDec": {
+        // Same again: an empty line means the last answer.
+        const typed = st.entry.text.trim();
+        if (!typed) {
+          if (typeof env.ans !== "number") return note("ERR: DATA TYPE");
+          set({
+            history: [
+              ...st.history,
+              {
+                id: st.history.length + 1,
+                input: `${formatNumber(env.ans, fmt())}▸Dec`,
+                output: formatNumber(env.ans, { notation: "normal", decimals: -1 }),
+                isError: false,
+              },
+            ],
+            entry: { text: "", caret: 0 },
+            screen: "home",
+          });
+          return;
+        }
         const { ok, text } = evalEntry();
         if (!ok) return note(text || "ERR: SYNTAX");
         set({
@@ -1828,6 +1856,16 @@ const initCalc: StateCreator<CalcState> = (set, get) => {
 };
 
 /** A fresh, isolated device. */
+/**
+ * Which dispatcher branches have run in this process.
+ *
+ * Only the test suite reads it — see scripts/coverage.test.ts, which turns
+ * "every action resolves" into the stronger "every action is exercised".
+ */
+export const reachedVerbs = new Set<string>();
+/** The same, for the instructions that act on the device. */
+export const reachedCommands = new Set<string>();
+
 export const createCalcStore = () => create<CalcState>(initCalc);
 
 export const useCalc = createCalcStore();

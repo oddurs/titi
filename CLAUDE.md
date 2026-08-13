@@ -204,6 +204,13 @@ it from the lexer's `FUNCTIONS`, so adding a function to the engine puts it in
 the catalog. A letter key in any open menu jumps the selection rather than
 typing; the catalog just happens to be the menu that needs it.
 
+**Every dispatcher branch has to be exercised.** `store.ts` records which
+verbs and device instructions have run, and `scripts/coverage.test.ts` — last
+in `scripts/test.ts`, because it reads what everything before it touched —
+fails if one was never reached. That is a stronger promise than
+`actions.test.ts` makes: a case can resolve and still never run, and seven of
+them never did, two of which were broken.
+
 **Actions are one namespace, dispatched on the verb.** `runAction` splits on
 `:` and switches on the first part, so `rcl:A` is the `rcl` case with an
 argument. There used to be a second switch on the whole string; between them a

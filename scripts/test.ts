@@ -19,6 +19,8 @@ import "./manual.test";
 import "./inventory.test";
 import "./conformance.test";
 import "./roadmap.test";
+// Last, because it reads what everything above it happened to reach.
+import "./coverage.test";
 import { report } from "./harness";
 
 report();
